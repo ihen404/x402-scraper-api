@@ -9,6 +9,16 @@ app.use(express.json());
 const walletAddress = process.env.PAYMENT_WALLET_ADDRESS;
 const port = process.env.PORT || 3000;
 
+// Root and Health Check routes for Railway proxy verification
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'x402 Scraper API is active' });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// Protect the endpoint with x402 payment middleware ($0.02 USDC on Base)
 app.use('/api/scrape', x402Middleware({
   payTo: walletAddress,
   price: '0.02',
@@ -45,5 +55,5 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 app.listen(port, '0.0.0.0', () => {
-  console.log(`x402 Scraper API running on 0.0.0.0:${port}`);
+  console.log(`x402 Scraper API listening on 0.0.0.0:${port}`);
 });
