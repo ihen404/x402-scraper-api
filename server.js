@@ -9,7 +9,6 @@ app.use(express.json());
 const walletAddress = process.env.PAYMENT_WALLET_ADDRESS;
 const port = process.env.PORT || 3000;
 
-// Protect the endpoint with x402 payment requirements ($0.02 USDC on Base)
 app.use('/api/scrape', x402Middleware({
   payTo: walletAddress,
   price: '0.02',
@@ -45,4 +44,4 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-app.listen(port, () => console.log(`x402 Scraper API running on port ${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`x402 Scraper API running on port ${port}`));
