@@ -44,4 +44,6 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-app.listen(port, '0.0.0.0', () => console.log(`x402 Scraper API running on port ${port}`));
+app.listen(port, '0.0.0.0', () => {
+  console.log(`x402 Scraper API running on 0.0.0.0:${port}`);
+});
