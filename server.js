@@ -1,7 +1,12 @@
 const express = require('express');
 const puppeteer = require('puppeteer-core');
 const TurndownService = require('turndown');
-const { x402Middleware } = require('@ihentrel/x402-express');
+const x402Pkg = require('@ihentrel/x402-express');
+
+// Resolve function regardless of export format (default vs named vs root)
+const x402Middleware = typeof x402Pkg === 'function' 
+  ? x402Pkg 
+  : (x402Pkg.x402Middleware || x402Pkg.default);
 
 const app = express();
 app.use(express.json());
@@ -18,9 +23,13 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Explicit Middleware Handler Wrapper
+// Middleware Handler
 const handleX402 = (req, res, next) => {
   try {
+    if (typeof x402Middleware !== 'function') {
+      throw new Error(`Resolved x402Middleware is type '${typeof x402Middleware}'`);
+    }
+
     const middleware = x402Middleware({
       payTo: walletAddress,
       price: '0.02',
@@ -35,7 +44,7 @@ const handleX402 = (req, res, next) => {
   }
 };
 
-// Route Registration
+// Main Endpoint
 app.post('/api/scrape', handleX402, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
@@ -63,7 +72,6 @@ app.post('/api/scrape', handleX402, async (req, res) => {
   }
 });
 
-// Catch-All 404 Handler returning JSON
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found', path: req.path, method: req.method });
 });
