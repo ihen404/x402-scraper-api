@@ -9,17 +9,17 @@ app.use(express.json());
 const walletAddress = process.env.PAYMENT_WALLET_ADDRESS || '0x0000000000000000000000000000000000000000';
 const port = process.env.PORT || 8080;
 
-// Health check routes
+// Health Check Routes
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'x402 Scraper API active' });
+  res.status(200).json({ status: 'ok', message: 'x402 Scraper API is active' });
 });
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Middleware wrapper to prevent unhandled fallthrough
-const x402Protection = (req, res, next) => {
+// Explicit Middleware Handler Wrapper
+const handleX402 = (req, res, next) => {
   try {
     const middleware = x402Middleware({
       payTo: walletAddress,
@@ -30,13 +30,13 @@ const x402Protection = (req, res, next) => {
     });
     return middleware(req, res, next);
   } catch (err) {
-    console.error('x402 Middleware Error:', err);
-    return res.status(500).json({ error: 'x402 Middleware setup error', details: err.message });
+    console.error('x402 execution error:', err.message);
+    return res.status(500).json({ error: 'x402 Middleware Error', details: err.message });
   }
 };
 
-// Route definition
-app.post('/api/scrape', x402Protection, async (req, res) => {
+// Route Registration
+app.post('/api/scrape', handleX402, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
@@ -63,9 +63,9 @@ app.post('/api/scrape', x402Protection, async (req, res) => {
   }
 });
 
-// Catch-all route to confirm what Express sees
+// Catch-All 404 Handler returning JSON
 app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found', method: req.method, path: req.path });
+  res.status(404).json({ error: 'Endpoint not found', path: req.path, method: req.method });
 });
 
 app.listen(port, '0.0.0.0', () => {
