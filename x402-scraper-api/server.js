@@ -1,3 +1,17 @@
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
+//Recommended flags for running puppeteer inside Railway container
+const browser = await puppeteer.launch({
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
+
+
 require('dotenv').config();
 const express = require('express');
 const x402 = require('@ihentrel/x402-express');
