@@ -17,8 +17,8 @@ const turndownService = new TurndownService({
 app.use('/api/scrape', x402({
   payTo: process.env.PAYMENT_WALLET_ADDRESS ||'0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28',
   price: '0.005', // $0.005 USDC per request
-  asset: 'USDC',
-  network: 'base'
+  network: 'base',
+  asset: 'USDC'
 }));
 
 // Main Scraper Endpoint
@@ -38,9 +38,8 @@ app.post('/api/scrape', async (req, res) => {
 });
    
 // Bind to PORT provided by Railway
-const PORT provided by Railway
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, 'O.0.0.0' , () => {
+app.listen(PORT, '0.0.0.0' , () => {
   console.log('Server listening on port ${PORT}');
 });
 
