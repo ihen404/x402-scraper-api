@@ -2,35 +2,23 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// Load x402 conditionally to prevent crashes if environment variables are missing
-try {
-  const x402 = require('@ihentrel/x402-express');
-  app.use('/api/scrape', x402({
-    payTo: process.env.PAYMENT_WALLET_ADDRESS || '0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28',
-    price: '0.005',
-    network: 'base',
-    asset: 'USDC'
-  }));
-} catch (err) {
-  console.error('Failed to initialize x402 middleware:', err.message);
-}
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// Scraper Endpoint
-app.post('/api/scrape', async (req, res) => {
-  const { url } = req.body;
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  try {
-    return res.json({ success: true, message: `Scraping initialized for ${url}` });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+app.post('/api/scrape', (req, res) => {
+  res.status(402).json({
+    error: "Payment Required",
+    message: "This endpoint requires an on-chain payment of 0.005 USDC on Base.",
+    accepts: {
+      scheme: "exact",
+      payTo: process.env.PAYMENT_WALLET_ADDRESS || "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
+      price: "0.005",
+      asset: "USDC",
+      network: "base"
+    }
+  });
 });
 
-// Bind to dynamic PORT assigned by Railway
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
