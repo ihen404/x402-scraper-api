@@ -26,40 +26,22 @@ app.post('/api/scrape', async (req, res) => {
   const { url } = req.body;
 
   if (!url) {
-    return res.status(400).json({ error: 'Missing "url" in request body.' });
+    return res.status(400).json({ error: 'URL IS required' });
   }
 
-  let browser;
-  try {
-    // Launch headless browser
-    browser = await puppeteer.launch({
-      executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 15000 });
-
-    // Extract body HTML and convert to clean Markdown
-    const bodyHtml = await page.evaluate(() => document.body.innerHTML);
-    const markdown = turndownService.turndown(bodyHtml);
-
-    await browser.close();
-
-    return res.json({
-      success: true,
-      url,
-      markdown,
-      timestamp: new Date().toISOString()
-    });
+  
+  try { 
+    return res.json({ success: true, message: 'Scraping initialized for ${url}' });
   } catch (err) {
-    if (browser) await browser.close();
-    return res.status(500).json({ error: 'Failed to scrape target URL', details: err.message });
+    return res.status(500).json({ error: err.message});
   }
 });
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`x402 Paid Scraper API running on port ${PORT}`);
+   
+// Bind to PORT provided by Railway
+const PORT provided by Railway
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, 'O.0.0.0' , () => {
+  console.log('Server listening on port ${PORT}');
 });
+
+  
