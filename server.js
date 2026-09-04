@@ -1,4 +1,6 @@
 const express = require("express");
+const axios = require("axios");
+const cheerio = require("cheerio");
 require("dotenv").config();
 
 let x402;
@@ -31,6 +33,20 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+async function scrapeUrl(url) {
+  const { data } = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+    timeout: 10000
+  });
+  const $ = cheerio.load(data);
+  return {
+    title: $("title").text().trim() || "No Title Found",
+    description: $("meta[name="description"]").attr("content") || "",
+    heading: $("h1").first().text().trim() || "",
+    textPreview: $("p").text().substring(0, 500).trim()
+  };
+}
+
 app.post("/api/scrape", (req, res, next) => {
   if (req.headers["x-test-bypass"] === "true") {
     return next();
@@ -49,16 +65,25 @@ app.post("/api/scrape", (req, res, next) => {
       network: NETWORK
     }
   });
-}, (req, res) => {
-  const targetUrl = req.body.url || "https://example.com";
-  res.json({
-    status: "success",
-    url: targetUrl,
-    data: {
-      title: "Example Domain",
-      content: "Scraped successfully."
-    }
-  });
+}, async (req, res) => {
+  const targetUrl = req.body.url;
+  if (!targetUrl) {
+    return res.status(400).json({ error: "Missing url in request body" });
+  }
+
+  try {
+    const scrapedData = await scrapeUrl(targetUrl);
+    res.json({
+      status: "success",
+      url: targetUrl,
+      data: scrapedData
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Scraping Failed",
+      message: err.message
+    });
+  }
 });
 
 const PORT = process.env.PORT || 8080;
