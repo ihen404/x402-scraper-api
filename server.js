@@ -41,7 +41,7 @@ async function scrapeUrl(url) {
   const $ = cheerio.load(data);
   return {
     title: $("title").text().trim() || "No Title Found",
-    description: $("meta[name="description"]").attr("content") || "",
+    description: $('meta[name="description"]').attr("content") || "",
     heading: $("h1").first().text().trim() || "",
     textPreview: $("p").text().substring(0, 500).trim()
   };
