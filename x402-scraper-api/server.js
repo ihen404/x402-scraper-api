@@ -1,3 +1,4 @@
+const rateLimit = require("express-rate-limit");
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
@@ -12,6 +13,15 @@ try {
 
 const app = express();
 app.use(express.json());
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests", message: "Rate limit exceeded. Please try again later." }
+});
+app.use("/api/", limiter);
+
 
 const RECIPIENT_ADDRESS = process.env.PAYMENT_WALLET_ADDRESS || "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28";
 const NETWORK = "base";
