@@ -1,0 +1,30 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/2025-11-25/server-manifest.json",
+  "name": "io.github.ihen404/x402-scraper-client",
+  "description": "Payment-gated web scraping micro-service utilizing HTTP 402 payments (0.005 USDC on Base Mainnet).",
+  "version": "1.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ihen404/x402-scraper-api.git"
+  },
+  "publisher": {
+    "name": "Ike Ambrose Hentrel II",
+    "github": "ihen404"
+  },
+  "tools": [
+    {
+      "name": "scrape_url",
+      "description": "Scrapes raw web page HTML, title, headings, and clean body text preview given a target URL. Handles on-chain 0.005 USDC auto-settlement on Base via x402 protocol.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The HTTP/HTTPS URL of the web page to scrape."
+          }
+        },
+        "required": ["url"]
+      }
+    }
+  ]
+}
