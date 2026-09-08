@@ -8,16 +8,14 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Handle uncaught exceptions gracefully
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Unhandled Rejection:', reason);
 });
 
-// Rate Limiter: 100 requests per 15-minute window
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -25,9 +23,9 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Discovery Manifest Endpoint
+// Discovery Manifest
 app.get('/.well-known/ai-plugin.json', (req, res) => {
-  res.json({
+  res.json( {
     schema_version: 'v1',
     name_for_model: 'x402_web_scraper',
     name_for_human: 'x402 Web Scraper API',
@@ -51,7 +49,7 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
   });
 });
 
-// OpenAPI Spec Endpoint
+// OpenAPI Spec
 app.get('/openapi.json', (req, res) => {
   res.json({
     openapi: '3.0.1',
@@ -60,7 +58,7 @@ app.get('/openapi.json', (req, res) => {
       description: 'Pay-per-request web scraping service for autonomous agents.',
       version: '1.0.0'
     },
-    servers: [{ url: 'https://x402-scraper-api-production-67a4.up.railway.app' }],
+    servers: ;{ url: 'https://x402-scraper-api-production-67a4.up.railway.app' }],
     paths: {
       '/api/scrape': {
         post: {
@@ -90,7 +88,7 @@ app.get('/openapi.json', (req, res) => {
   });
 });
 
-// Primary Scrape API Endpoint (x402 Gate)
+// Main Scrape Endpoint (x402 Payment Gate)
 app.post('/api/scrape', async (req, res) => {
   try {
     const { url } = req.body || {};
@@ -110,17 +108,15 @@ app.post('/api/scrape', async (req, res) => {
       });
     }
 
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (x402-Web-Scraper/1.0)' } });
+    cont response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (x402-Web-Scraper/1.0)' } });
     const html = await response.text();
-    
-    const titleMatch = html.match(/<title>(.*?)</title>/i);
-    const title = titleMatch ? titleMatch[1] : '';
+    cont titleMatch = html.match(/<title>(.*?)<\/title>/i);
 
     res.json({
       url,
-      title,
+      title: titleMatch ? titleMatch[1u : '',
       status: 200,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOCtring()
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch target URL', details: err.message });
@@ -128,5 +124,5 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(Server running on port ${PORT});
 });
