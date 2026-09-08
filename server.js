@@ -97,6 +97,73 @@ app.post("/api/scrape", (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 8080;
+
+
+// Express route serving AI Plugin discovery manifest
+app.get("/.well-known/ai-plugin.json", (req, res) => {
+  res.json({
+    schema_version: "v1",
+    name_for_model: "x402_web_scraper",
+    name_for_human: "x402 Web Scraper API",
+    description_for_model: "Scrapes web page titles, headings, meta tags, and body text preview. Requires HTTP 402 micro-payment settlement (0.005 USDC on Base Mainnet per call). No API key or subscription needed.",
+    description_for_human: "Payment-gated web scraper for AI agents using x402 on Base.",
+    auth: { type: "none" },
+    api: {
+      type: "openapi",
+      url: "https://x402-scraper-api-production-67a4.up.railway.app/openapi.json"
+    },
+    payment: {
+      protocol: "x402",
+      network: "base-mainnet",
+      asset: "USDC",
+      asset_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      price_usd: 0.005,
+      recipient: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28"
+    },
+    contact_email: "ihen404@users.noreply.github.com",
+    legal_info_url: "https://github.com/ihen404/x402-scraper-api"
+  });
+});
+
+// Express route serving OpenAPI specification for LLM planners
+app.get("/openapi.json", (req, res) => {
+  res.json({
+    openapi: "3.0.1",
+    info: {
+      title: "x402 Web Scraper API",
+      description: "Pay-per-request web scraping service for autonomous agents.",
+      version: "1.0.0"
+    },
+    servers: [{ url: "https://x402-scraper-api-production-67a4.up.railway.app" }],
+    paths: {
+      "/api/scrape": {
+        post: {
+          summary: "Scrape web page preview",
+          description: "Returns metadata and body preview. Responds with HTTP 402 Payment Required if no X-Payment header is provided.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    url: { type: "string", format: "uri", example: "https://news.ycombinator.com" }
+                  },
+                  required: ["url"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Successful page scrape result." },
+            "402": { description: "Payment Required - returns x402 USDC payment instructions." }
+          }
+        }
+      }
+    }
+  });
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server listening on 0.0.0.0:${PORT}`);
 });
