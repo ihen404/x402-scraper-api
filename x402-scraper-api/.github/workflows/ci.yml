@@ -1,0 +1,46 @@
+name: Continuous Integration Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-endpoints:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Verify Local Syntax
+        run: node -c server.js
+
+      - name: Test Production OpenAPI Spec Endpoint
+        run: |
+          RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://x402-scraper-api-production-67a4.up.railway.app/openapi.json)
+          if [ "$RESPONSE_CODE" -ne 200 ]; then
+            echo "OpenAPI endpoint failed with HTTP $RESPONSE_CODE"
+            exit 1
+          fi
+          echo "OpenAPI endpoint reachable (HTTP 200)"
+
+      - name: Test Production x402 Payment Gate (HTTP 402)
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://x402-scraper-api-production-67a4.up.railway.app/api/scrape \
+            -H "Content-Type: application/json" \
+            -d '{"url":"https://news.ycombinator.com"}')
+          if [ "$HTTP_STATUS" -ne 402 ]; then
+            echo "Expected HTTP 402 Payment Required, got HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "x402 Payment Gate verified (HTTP 402)"
