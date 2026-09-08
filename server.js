@@ -8,6 +8,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Handle uncaught exceptions gracefully
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Rate Limiter: 100 requests per 15-minute window
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -83,25 +92,25 @@ app.get('/openapi.json', (req, res) => {
 
 // Primary Scrape API Endpoint (x402 Gate)
 app.post('/api/scrape', async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: 'URL is required' });
-
-  const paymentHeader = req.headers['x-payment'];
-  if (!paymentHeader) {
-    return res.status(402).json({
-      error: 'Payment Required',
-      protocol: 'x402',
-      network: 'base-mainnet',
-      asset: 'USDC',
-      asset_address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-      amount: '5000',
-      price_usd: 0.005,
-      recipient: '0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28'
-    });
-  }
-
   try {
-    const response = await fetch(url);
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+
+    const paymentHeader = req.headers['x-payment'];
+    if (!paymentHeader) {
+      return res.status(402).json({
+        error: 'Payment Required',
+        protocol: 'x402',
+        network: 'base-mainnet',
+        asset: 'USDC',
+        asset_address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        amount: '5000',
+        price_usd: 0.005,
+        recipient: '0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28'
+      });
+    }
+
+    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (x402-Web-Scraper/1.0)' } });
     const html = await response.text();
     
     const titleMatch = html.match(/<title>(.*?)</title>/i);
@@ -118,6 +127,6 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
