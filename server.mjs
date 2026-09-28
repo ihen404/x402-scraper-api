@@ -15,15 +15,19 @@ const serverCardPayload = {
   }
 };
 
-// Base health check
-app.get('/', (req, res) => {
-  res.send('x402 Scraper API is active');
-});
-
 // Smithery Discovery Metadata Routes
 app.get(['/.well-known/mcp/server-card.json', '/.well-known/mcp.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.status(200).json(serverCardPayload);
+});
+
+// Base Route & MCP Protocol Fallback
+app.all('*', (req, res) => {
+  if (req.headers['accept']?.includes('application/json') || req.method === 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).json(serverCardPayload);
+  }
+  res.status(200).send('x402 Scraper API is active');
 });
 
 const PORT = process.env.PORT || 3000;
