@@ -3,34 +3,72 @@ import express from 'express';
 const app = express();
 app.use(express.json());
 
-const serverCardPayload = {
-  "$schema": "https://smithery.ai/mcp-server-card.schema.json",
-  "name": "x402-scraper",
-  "description": "Autonomous pay-per-request web scraper operating on Base using x402 microtransactions.",
-  "version": "1.0.23",
-  "transport": {
-    "type": "stdio",
-    "command": "node",
-    "args": ["dist/index.js"]
+app.post('/', (req, res) => {
+  const { jsonrpc, id, method } = req.body;
+
+  if (jsonrpc !== '2.0') {
+    return res.status(400).json({
+      jsonrpc: '2.0',
+      id: id || null,
+      error: { code: -32600, message: 'Invalid Request: Expected jsonrpc 2.0' }
+    });
   }
-};
 
-// Smithery Discovery Metadata Routes
-app.get(['/.well-known/mcp/server-card.json', '/.well-known/mcp.json'], (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.status(200).json(serverCardPayload);
-});
+  switch (method) {
+    case 'initialize':
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: '2024-11-05',
+          capabilities: { tools: {} },
+          serverInfo: { name: 'x402-scraper', version: '1.0.0' }
+        }
+      });
 
-// Base Route & MCP Protocol Fallback
-app.all('*', (req, res) => {
-  if (req.headers['accept']?.includes('application/json') || req.method === 'POST') {
-    res.setHeader('Content-Type', 'application/json');
-    return res.status(200).json(serverCardPayload);
+    case 'tools/list':
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          tools: [
+            {
+              name: 'scrape_url',
+              description: 'Scrapes content from a given web URL',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  url: { type: 'string' }
+                },
+                required: ['url']
+              }
+            }
+          ]
+        }
+      });
+
+    case 'resources/list':
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        result: { resources: [] }
+      });
+
+    case 'prompts/list':
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        result: { prompts: [] }
+      });
+
+    default:
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: 'Method not found' }
+      });
   }
-  res.status(200).send('x402 Scraper API is active');
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`MCP Server running on port ${PORT}`));
