@@ -1,38 +1,19 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
-async function main() {
+const transport = new SSEClientTransport(
+  new URL("https://YOUR-RAILWAY-APP-URL.up.railway.app/mcp")
+);
+
+const client = new Client({ name: "demo-agent", version: "1.0.0" });
+
+async function run() {
   console.log("🤖 Initializing agent connection to MCP Server...");
-
-  const transport = new StreamableHTTPClientTransport(
-    new URL("https://x402-scraper-api-production-67a4.up.railway.app/mcp")
-  );
-
-  const client = new Client(
-    {
-      name: "x402-demo-agent",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {},
-    }
-  );
-
   await client.connect(transport);
-  console.log("✅ Connected to MCP Server!");
+  console.log(" Connected to MCP server!");
 
   const tools = await client.listTools();
-  console.log("🛠️  Discovered tools:", JSON.stringify(tools, null, 2));
-
-  console.log("🕷️  Requesting web scrape for: https://news.ycombinator.com");
-  const response = await client.callTool({
-    name: "scrape",
-    arguments: {
-      url: "https://news.ycombinator.com"
-    }
-  });
-
-  console.log("📄 Scrape Result:", JSON.stringify(response, null, 2));
+  console.log("Available tools:", tools);
 }
 
-main().catch(console.error);
+run().catch(console.error);
