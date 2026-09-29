@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
@@ -52,8 +52,6 @@ const mcpServer = new Server(
   { name: "x402-scraper-api", version: "1.0.0" },
   { capabilities: { tools: {} } }
 );
-
-const transports = new Map();
 
 async function scrapeUrl(url) {
   console.log(`[Scraper] Fetching URL: ${url}`);
@@ -126,8 +124,7 @@ app.get("/.well-known/x402", (req, res) => {
     price_per_request_usd: X402_CONFIG.pricePerRequestUsd,
     accepted_tokens: [X402_CONFIG.token],
     endpoints: [
-      { path: "/mcp", method: "GET", type: "sse", description: "MCP Server-Sent Events transport endpoint" },
-      { path: "/messages", method: "POST", type: "mcp_rpc", description: "MCP Message RPC endpoint" },
+      { path: "/mcp", method: "POST", type: "mcp_streamable_http", description: "MCP Streamable HTTP endpoint" },
       { path: "/api/scrape", method: "POST", type: "http_402", description: "Direct REST HTTP 402 scraping endpoint" }
     ]
   });
@@ -155,36 +152,11 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text });
 });
 
-// Standard SSE Transport Endpoints
-app.get("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
-  console.log("New SSE connection requested on /mcp");
-  const transport = new SSEServerTransport("/messages", res);
-  transports.set(transport.sessionId, transport);
-  transport.onclose = () => {
-    transports.delete(transport.sessionId);
-    console.log(`SSE session closed: ${transport.sessionId}`);
-  };
+// Native Streamable HTTP Endpoint for Glama
+app.all("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
+  const transport = new StreamableHTTPServerTransport();
   await mcpServer.connect(transport);
-});
-
-// Also allow POST on /mcp to act as an alias to /messages for clients that post directly to the connection URL
-app.post("/mcp", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
-  const sessionId = req.query.sessionId;
-  const transport = transports.get(sessionId);
-  if (!transport) {
-    // If no session exists yet, initialize a temporary transport or return session required error
-    return res.status(400).json({ error: "No active session ID provided. Connect via GET /mcp first." });
-  }
-  await transport.handlePostMessage(req, res, req.body);
-});
-
-app.post("/messages", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
-  const sessionId = req.query.sessionId;
-  const transport = transports.get(sessionId);
-  if (!transport) {
-    return res.status(400).send("No active MCP connection session for sessionId: " + sessionId);
-  }
-  await transport.handlePostMessage(req, res, req.body);
+  await transport.handleRequest(req, res);
 });
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
