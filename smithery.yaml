@@ -1,7 +1,10 @@
-# Smithery Configuration
 startCommand:
-  type: stdio
-  config:
-    command: node
-    args:
-      - index.js
+  type: http
+  configSchema:
+    type: object
+    properties:
+      apiKey:
+        type: string
+        description: "Optional API Key for x402 scraper access"
+    required: []
+  endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
