@@ -21,11 +21,9 @@ async function main() {
   await client.connect(transport);
   console.log("✅ Connected to MCP Server!");
 
-  // Discover registered tools
   const tools = await client.listTools();
   console.log("🛠️  Discovered tools:", JSON.stringify(tools, null, 2));
 
-  // Execute scrape request
   console.log("🕷️  Requesting web scrape for: https://news.ycombinator.com");
   const response = await client.callTool({
     name: "scrape",
