@@ -129,7 +129,9 @@ app.post("/messages", express.json(), async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`MCP Server running on port ${PORT}`);
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const HOST = "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(`MCP Server running at http://${HOST}:${PORT}`);
 });
