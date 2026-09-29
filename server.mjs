@@ -55,14 +55,14 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-// DO NOT use express.json() here. Let SSEServerTransport consume req directly.
-app.post("/messages", async (req, res) => {
+// Explicit express.json() parser + direct req.body forwarding
+app.post("/messages", express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
 
   if (transport) {
     try {
-      await transport.handlePostMessage(req, res);
+      await transport.handlePostMessage(req, res, req.body);
     } catch (err) {
       console.error("Error handling post message:", err);
       if (!res.headersSent) {
