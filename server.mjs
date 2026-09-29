@@ -48,11 +48,6 @@ function authenticateApiKey(req, res, next) {
   next();
 }
 
-const mcpServer = new Server(
-  { name: "x402-scraper-api", version: "1.0.0" },
-  { capabilities: { tools: {} } }
-);
-
 async function scrapeUrl(url) {
   console.log(`[Scraper] Fetching URL: ${url}`);
   const response = await fetch(url, {
@@ -86,31 +81,40 @@ async function scrapeUrl(url) {
   };
 }
 
-mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: "scrape",
-      description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.001 USDC on Base]",
-      inputSchema: {
-        type: "object",
-        properties: {
-          url: { type: "string", description: "Target web URL to scrape" }
-        },
-        required: ["url"]
-      }
-    }
-  ]
-}));
+function createMcpServer() {
+  const server = new Server(
+    { name: "x402-scraper-api", version: "1.0.0" },
+    { capabilities: { tools: {} } }
+  );
 
-mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === "scrape") {
-    const { url } = request.params.arguments || {};
-    if (!url) throw new Error("URL argument is required");
-    const result = await scrapeUrl(url);
-    return { isError: result.isError, content: [{ type: "text", text: result.text }] };
-  }
-  throw new Error(`Tool not found: ${request.params.name}`);
-});
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "scrape",
+        description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.001 USDC on Base]",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target web URL to scrape" }
+          },
+          required: ["url"]
+        }
+      }
+    ]
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "scrape") {
+      const { url } = request.params.arguments || {};
+      if (!url) throw new Error("URL argument is required");
+      const result = await scrapeUrl(url);
+      return { isError: result.isError, content: [{ type: "text", text: result.text }] };
+    }
+    throw new Error(`Tool not found: ${request.params.name}`);
+  });
+
+  return server;
+}
 
 app.get("/", (req, res) => res.status(200).send("x402 Scraper MCP Server is live and healthy"));
 
@@ -152,11 +156,12 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text });
 });
 
-// Native Streamable HTTP Endpoint for Glama
+// Native Streamable HTTP Endpoint with per-request server isolation
 app.all("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
   try {
+    const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport();
-    await mcpServer.connect(transport);
+    await server.connect(transport);
     await transport.handleRequest(req, res);
   } catch (error) {
     console.error("Error handling Streamable HTTP request on /mcp:", error);
