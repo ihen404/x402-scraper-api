@@ -1,5 +1,4 @@
 import express from "express";
-import { Readable } from "stream";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -56,7 +55,7 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-// Reconstruct readable stream from parsed req.body
+// Use express.json() to parse the body into req.body and pass it explicitly to handlePostMessage
 app.post("/messages", express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
@@ -66,16 +65,7 @@ app.post("/messages", express.json(), async (req, res) => {
   }
 
   try {
-    // Convert parsed JSON body back into an unconsumed Readable Stream
-    const bodyString = JSON.stringify(req.body);
-    const stream = Readable.from([bodyString]);
-
-    // Attach request metadata expected by the SDK
-    stream.headers = req.headers;
-    stream.method = req.method;
-    stream.url = req.url;
-
-    await transport.handlePostMessage(stream, res);
+    await transport.handlePostMessage(req, res, req.body);
   } catch (err) {
     console.error("Error handling post message:", err);
     if (!res.headersSent) {
