@@ -1,7 +1,7 @@
 {
   "name": "x402-scraper-api",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs"
   },
