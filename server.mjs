@@ -5,15 +5,10 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 
 const app = express();
 
-// Apply express.json() ONLY to non-MCP routes so it doesn't lock the request stream
-app.use((req, res, next) => {
-  if (req.path === "/messages") {
-    return next();
-  }
-  express.json()(req, res, next);
-});
+// Parse standard JSON routes, but keep raw body buffer for /messages
+app.use(express.json());
+app.use("/messages", express.raw({ type: "application/json" }));
 
-// Root route health check
 app.get("/", (req, res) => {
   res.send("x402 Scraper MCP Server is live");
 });
@@ -53,32 +48,25 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 app.get("/mcp", async (req, res) => {
   console.log("New SSE connection requested on /mcp");
-  try {
-    const transport = new SSEServerTransport("/messages", res);
-    transports.set(transport.sessionId, transport);
+  const transport = new SSEServerTransport("/messages", res);
+  transports.set(transport.sessionId, transport);
 
-    transport.onclose = () => {
-      console.log(`Transport session ${transport.sessionId} closed`);
-      transports.delete(transport.sessionId);
-    };
+  transport.onclose = () => {
+    console.log(`Transport session ${transport.sessionId} closed`);
+    transports.delete(transport.sessionId);
+  };
 
-    await mcpServer.connect(transport);
-  } catch (err) {
-    console.error("Error connecting SSE transport:", err);
-    if (!res.headersSent) {
-      res.status(500).send("Internal Server Error");
-    }
-  }
+  await mcpServer.connect(transport);
 });
 
 app.post("/messages", async (req, res) => {
   const sessionId = req.query.sessionId;
-  const transport = transports.get(sessionId) || Array.from(transports.values())[0];
+  const transport = transports.get(sessionId);
 
   if (transport) {
     await transport.handlePostMessage(req, res);
   } else {
-    res.status(400).send("No active MCP connection session");
+    res.status(400).send("No active MCP connection session for sessionId: " + sessionId);
   }
 });
 
