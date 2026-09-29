@@ -1,5 +1,6 @@
-startCommand:
+deployment:
   type: http
+  endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
   configSchema:
     type: object
     properties:
@@ -7,4 +8,3 @@ startCommand:
         type: string
         description: "Optional API Key for x402 scraper access"
     required: []
-  endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
