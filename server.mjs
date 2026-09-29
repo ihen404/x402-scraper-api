@@ -38,12 +38,10 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
-// Health check
 app.get("/", (req, res) => {
   res.send("x402 Scraper MCP Server is live");
 });
 
-// SSE Handshake endpoint
 app.get("/mcp", async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
@@ -57,14 +55,14 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-// MCP POST messages endpoint requires explicit JSON body parsing
-app.post("/messages", express.json(), async (req, res) => {
+// DO NOT use express.json() here. Let SSEServerTransport consume req directly.
+app.post("/messages", async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
 
   if (transport) {
     try {
-      await transport.handlePostMessage(req, res, req.body);
+      await transport.handlePostMessage(req, res);
     } catch (err) {
       console.error("Error handling post message:", err);
       if (!res.headersSent) {
