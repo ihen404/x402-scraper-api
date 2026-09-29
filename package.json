@@ -1,13 +1,17 @@
 {
   "name": "x402-scraper-api",
   "version": "1.0.0",
+  "description": "MCP server for web scraping and text extraction",
   "type": "module",
   "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.6.0",
     "express": "^4.21.2"
   }
 }
