@@ -1,74 +1,85 @@
 import express from 'express';
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 
-app.post('/', (req, res) => {
-  const { jsonrpc, id, method } = req.body;
+// Helper scrape function
+async function scrapeUrl(url) {
+  return {
+    url,
+    title: "Example Title",
+    content: "Scraped content placeholder from production endpoint"
+  };
+}
 
-  if (jsonrpc !== '2.0') {
-    return res.status(400).json({
+// Base route
+app.get('/', (req, res) => {
+  res.send('x402 Scraper MCP Server is running');
+});
+
+// MCP JSON-RPC 2.0 Route Handler
+app.post('/mcp', async (req, res) => {
+  const { jsonrpc, id, method, params } = req.body || {};
+
+  if (method === 'initialize') {
+    return res.json({
       jsonrpc: '2.0',
-      id: id || null,
-      error: { code: -32600, message: 'Invalid Request: Expected jsonrpc 2.0' }
+      id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'x402-scraper', version: '1.0.0' }
+      }
     });
   }
 
-  switch (method) {
-    case 'initialize':
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          protocolVersion: '2024-11-05',
-          capabilities: { tools: {} },
-          serverInfo: { name: 'x402-scraper', version: '1.0.0' }
-        }
-      });
-
-    case 'tools/list':
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          tools: [
-            {
-              name: 'scrape_url',
-              description: 'Scrapes content from a given web URL',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  url: { type: 'string' }
-                },
-                required: ['url']
-              }
+  if (method === 'tools/list') {
+    return res.json({
+      jsonrpc: '2.0',
+      id,
+      result: {
+        tools: [
+          {
+            name: 'scrape',
+            description: 'Scrape content from a given URL',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                url: { type: 'string', description: 'Target URL to scrape' }
+              },
+              required: ['url']
             }
+          }
+        ]
+      }
+    });
+  }
+
+  if (method === 'tools/call') {
+    const { name, arguments: args } = params || {};
+    if (name === 'scrape') {
+      const scrapedData = await scrapeUrl(args?.url);
+      return res.json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          content: [
+            { type: 'text', text: JSON.stringify(scrapedData) }
           ]
         }
       });
-
-    case 'resources/list':
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: { resources: [] }
-      });
-
-    case 'prompts/list':
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        result: { prompts: [] }
-      });
-
-    default:
-      return res.json({
-        jsonrpc: '2.0',
-        id,
-        error: { code: -32601, message: 'Method not found' }
-      });
+    }
   }
+
+  res.json({
+    jsonrpc: '2.0',
+    id,
+    error: { code: -32601, message: 'Method not found' }
+  });
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`MCP Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
