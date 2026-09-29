@@ -7,10 +7,8 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 
 const app = express();
 
-// Trust reverse proxy headers (e.g. Railway, Cloudflare) for accurate IP rate limiting
 app.set("trust proxy", 1);
 
-// Configuration
 const walletAddress =
   process.env.PAYMENT_WALLET_ADDRESS ||
   process.env.payment_wallet_address ||
@@ -29,37 +27,24 @@ const X402_CONFIG = {
   token: "USDC"
 };
 
-// Rate Limiter: 60 requests per 1-minute window
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.headers["x-api-key"] || req.ip;
-  },
+  keyGenerator: (req) => req.headers["x-api-key"] || req.ip,
   message: {
     error: "Too Many Requests",
     message: "Rate limit exceeded. Maximum 60 requests per minute."
   }
 });
 
-// Middleware: API Key Authentication
 function authenticateApiKey(req, res, next) {
-  if (!EXPECTED_API_KEY) {
-    // If API_KEY environment variable is not set, allow requests through
-    return next();
-  }
-
+  if (!EXPECTED_API_KEY) return next();
   const apiKey = req.headers["x-api-key"] || req.query.apiKey;
-
   if (!apiKey || apiKey !== EXPECTED_API_KEY) {
-    return res.status(401).json({
-      error: "Unauthorized",
-      message: "Invalid or missing 'x-api-key' header."
-    });
+    return res.status(401).json({ error: "Unauthorized", message: "Invalid or missing 'x-api-key' header." });
   }
-
   next();
 }
 
@@ -80,10 +65,7 @@ async function scrapeUrl(url) {
   });
 
   if (!response.ok) {
-    return {
-      isError: true,
-      text: `HTTP Error ${response.status}: ${response.statusText}`
-    };
+    return { isError: true, text: `HTTP Error ${response.status}: ${response.statusText}` };
   }
 
   const html = await response.text();
@@ -97,16 +79,9 @@ async function scrapeUrl(url) {
     .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ");
 
   let bodyText = cleanHtml.replace(/<[^>]+>/g, " ");
-
-  bodyText = bodyText
-    .split("\n")
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .join("\n")
-    .replace(/ +/g, " ");
+  bodyText = bodyText.split("\n").map(l => l.trim()).filter(l => l.length > 0).join("\n").replace(/ +/g, " ");
 
   const truncatedText = bodyText.slice(0, 10000);
-
   return {
     isError: false,
     text: `TITLE: ${pageTitle}\nURL: ${url}\n\nCONTENT:\n${truncatedText}${bodyText.length > 10000 ? "\n\n[Content truncated...]" : ""}`
@@ -132,32 +107,14 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "scrape") {
     const { url } = request.params.arguments || {};
-    if (!url) {
-      throw new Error("URL argument is required");
-    }
-
-    try {
-      const result = await scrapeUrl(url);
-      return {
-        isError: result.isError,
-        content: [{ type: "text", text: result.text }]
-      };
-    } catch (err) {
-      console.error(`Error scraping ${url}:`, err);
-      return {
-        isError: true,
-        content: [{ type: "text", text: `Scraping failed: ${err.message}` }]
-      };
-    }
+    if (!url) throw new Error("URL argument is required");
+    const result = await scrapeUrl(url);
+    return { isError: result.isError, content: [{ type: "text", text: result.text }] };
   }
-
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
-// Public Health & Metadata Endpoints
-app.get("/", (req, res) => {
-  res.status(200).send("x402 Scraper MCP Server is live and healthy");
-});
+app.get("/", (req, res) => res.status(200).send("x402 Scraper MCP Server is live and healthy"));
 
 app.get("/.well-known/x402", (req, res) => {
   res.status(200).json({
@@ -169,101 +126,93 @@ app.get("/.well-known/x402", (req, res) => {
     price_per_request_usd: X402_CONFIG.pricePerRequestUsd,
     accepted_tokens: [X402_CONFIG.token],
     endpoints: [
-      {
-        path: "/mcp",
-        method: "GET",
-        type: "sse",
-        description: "MCP Server-Sent Events transport endpoint"
-      },
-      {
-        path: "/messages",
-        method: "POST",
-        type: "mcp_rpc",
-        description: "MCP Message RPC endpoint"
-      },
-      {
-        path: "/api/scrape",
-        method: "POST",
-        type: "http_402",
-        description: "Direct REST HTTP 402 scraping endpoint"
-      }
+      { path: "/mcp", method: "GET", type: "sse", description: "MCP Server-Sent Events transport endpoint" },
+      { path: "/mcp", method: "POST", type: "mcp_rpc", description: "MCP Message RPC endpoint" },
+      { path: "/api/scrape", method: "POST", type: "http_402", description: "Direct REST HTTP 402 scraping endpoint" }
     ]
   });
 });
 
-// Protected Scrape Endpoint
 app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const paymentProof = req.headers["x-402-payment-proof"] || req.headers["authorization"];
-
   if (!paymentProof) {
     res.setHeader("X-402-Price-USD", X402_CONFIG.pricePerRequestUsd);
     res.setHeader("X-402-Network", X402_CONFIG.network);
     res.setHeader("X-402-Token", X402_CONFIG.token);
     res.setHeader("X-402-Payment-Address", X402_CONFIG.paymentAddress);
-
     return res.status(402).json({
       error: "Payment Required",
       message: "This endpoint requires an x402 payment proof on Base",
-      x402: {
-        price_usd: X402_CONFIG.pricePerRequestUsd,
-        network: X402_CONFIG.network,
-        token: X402_CONFIG.token,
-        payment_address: X402_CONFIG.paymentAddress
-      }
+      x402: { price_usd: X402_CONFIG.pricePerRequestUsd, network: X402_CONFIG.network, token: X402_CONFIG.token, payment_address: X402_CONFIG.paymentAddress }
     });
   }
 
   const { url } = req.body || {};
-  if (!url) {
-    return res.status(400).json({ error: "Missing 'url' parameter in JSON body" });
-  }
+  if (!url) return res.status(400).json({ error: "Missing 'url' parameter in JSON body" });
 
-  try {
-    const result = await scrapeUrl(url);
-    if (result.isError) {
-      return res.status(502).json({ error: result.text });
-    }
-    return res.status(200).json({ url, result: result.text });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  const result = await scrapeUrl(url);
+  if (result.isError) return res.status(502).json({ error: result.text });
+  return res.status(200).json({ url, result: result.text });
 });
 
-// MCP Connection Handlers
+// MCP Endpoints supporting both SSE and Streamable HTTP clients (like Glama)
 app.get("/mcp", apiLimiter, async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
-
-  transport.onclose = () => {
-    console.log(`Transport session ${transport.sessionId} closed`);
-    transports.delete(transport.sessionId);
-  };
-
+  transport.onclose = () => transports.delete(transport.sessionId);
   await mcpServer.connect(transport);
+});
+
+app.post("/mcp", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
+  const sessionId = req.query.sessionId;
+  
+  // If Glama or a streamable client connects directly via POST without a session query param, 
+  // initialize an inline stateless transport request mapping
+  if (!sessionId) {
+    try {
+      let handled = false;
+      const transport = {
+        send: async (msg) => {
+          if (!handled) {
+            handled = true;
+            res.setHeader("Content-Type", "application/json");
+            res.status(200).json(msg);
+          }
+        },
+        close: async () => {}
+      };
+      // Handle the incoming JSON-RPC message directly against the server instance
+      await mcpServer.handleMessage(req.body);
+      // Fallback response if message handler didn't trigger transport.send synchronously
+      if (!res.headersSent) {
+        return res.status(200).json({ jsonrpc: "2.0", result: {}, id: req.body.id || null });
+      }
+      return;
+    } catch (err) {
+      console.error("Error handling stateless MCP POST:", err);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: err.message });
+      }
+      return;
+    }
+  }
+
+  const transport = transports.get(sessionId);
+  if (!transport) {
+    return res.status(400).send("No active MCP connection session for sessionId: " + sessionId);
+  }
+  await transport.handlePostMessage(req, res, req.body);
 });
 
 app.post("/messages", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
-
   if (!transport) {
     return res.status(400).send("No active MCP connection session for sessionId: " + sessionId);
   }
-
-  try {
-    await transport.handlePostMessage(req, res, req.body);
-  } catch (err) {
-    console.error("Error handling post message:", err);
-    if (!res.headersSent) {
-      res.status(500).send("Error processing message");
-    }
-  }
+  await transport.handlePostMessage(req, res, req.body);
 });
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
-const HOST = "0.0.0.0";
-
-app.listen(PORT, HOST, () => {
-  console.log(`MCP Server running at http://${HOST}:${PORT}`);
-});
+app.listen(PORT, "0.0.0.0", () => console.log(`MCP Server running on port ${PORT}`));
