@@ -38,12 +38,12 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
-// Root health check
+// Health check
 app.get("/", (req, res) => {
   res.send("x402 Scraper MCP Server is live");
 });
 
-// MCP SSE endpoint initialization
+// SSE Handshake endpoint
 app.get("/mcp", async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
@@ -57,14 +57,14 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-// Post message endpoint MUST handle raw unparsed stream directly
-app.post("/messages", async (req, res) => {
+// MCP POST messages endpoint requires explicit JSON body parsing
+app.post("/messages", express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
 
   if (transport) {
     try {
-      await transport.handlePostMessage(req, res);
+      await transport.handlePostMessage(req, res, req.body);
     } catch (err) {
       console.error("Error handling post message:", err);
       if (!res.headersSent) {
@@ -75,9 +75,6 @@ app.post("/messages", async (req, res) => {
     res.status(400).send("No active MCP connection session for sessionId: " + sessionId);
   }
 });
-
-// Standard JSON middleware applied strictly to all OTHER routes AFTER /messages
-app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
