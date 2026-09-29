@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import { rateLimit } from "express-rate-limit";
+import { createPublicClient, http, parseAbiItem } from "viem";
+import { base } from "viem/chains";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -16,6 +18,15 @@ const walletAddress =
   "0x0000000000000000000000000000000000000000";
 
 const EXPECTED_API_KEY = process.env.API_KEY || null;
+
+// Base Mainnet USDC Contract Address
+const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+// Initialize Viem public client for Base
+const baseClient = createPublicClient({
+  chain: base,
+  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org")
+});
 
 const X402_CONFIG = {
   version: "1.0",
@@ -46,6 +57,57 @@ function authenticateApiKey(req, res, next) {
     return res.status(401).json({ error: "Unauthorized", message: "Invalid or missing 'x-api-key' header." });
   }
   next();
+}
+
+/**
+ * Verifies if a given transaction hash represents a valid USDC transfer on Base to our payment address.
+ */
+async function verifyOnChainPayment(txHash) {
+  if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) {
+    return { valid: false, error: "Invalid transaction hash format" };
+  }
+
+  // If wallet address is placeholder, bypass verification in test/dev mode
+  if (walletAddress === "0x0000000000000000000000000000000000000000") {
+    console.warn("[x402] Warning: Using zero address wallet. Bypassing on-chain check.");
+    return { valid: true };
+  }
+
+  try {
+    const txReceipt = await baseClient.getTransactionReceipt({ hash: txHash });
+    if (!txReceipt || txReceipt.status !== "success") {
+      return { valid: false, error: "Transaction failed or not found on Base" };
+    }
+
+    // Parse Transfer logs for USDC contract
+    const transferEventSig = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
+    
+    let verified = false;
+    for (const log of txReceipt.logs) {
+      if (log.address.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase()) {
+        try {
+          // Check topics or decode if matches Transfer event
+          // Topics: [eventSig, indexed from, indexed to]
+          const toAddress = `0x${log.topics[2]?.slice(26)}`.toLowerCase();
+          if (toAddress === walletAddress.toLowerCase()) {
+            verified = true;
+            break;
+          }
+        } catch (e) {
+          // ignore parsing error for non-matching logs
+        }
+      }
+    }
+
+    if (!verified) {
+      return { valid: false, error: "No valid USDC transfer found to payment address in transaction logs" };
+    }
+
+    return { valid: true };
+  } catch (err) {
+    console.error("[x402] Verification error:", err);
+    return { valid: false, error: `On-chain validation error: ${err.message}` };
+  }
 }
 
 async function scrapeUrl(url) {
@@ -136,6 +198,7 @@ app.get("/.well-known/x402", (req, res) => {
 
 app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const paymentProof = req.headers["x-402-payment-proof"] || req.headers["authorization"];
+  
   if (!paymentProof) {
     res.setHeader("X-402-Price-USD", X402_CONFIG.pricePerRequestUsd);
     res.setHeader("X-402-Network", X402_CONFIG.network);
@@ -143,7 +206,17 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
     res.setHeader("X-402-Payment-Address", X402_CONFIG.paymentAddress);
     return res.status(402).json({
       error: "Payment Required",
-      message: "This endpoint requires an x402 payment proof on Base",
+      message: "This endpoint requires an x402 USDC payment proof transaction hash on Base",
+      x402: { price_usd: X402_CONFIG.pricePerRequestUsd, network: X402_CONFIG.network, token: X402_CONFIG.token, payment_address: X402_CONFIG.paymentAddress }
+    });
+  }
+
+  // Verify on-chain transaction hash
+  const verification = await verifyOnChainPayment(paymentProof);
+  if (!verification.valid) {
+    return res.status(402).json({
+      error: "Invalid Payment Proof",
+      message: verification.error,
       x402: { price_usd: X402_CONFIG.pricePerRequestUsd, network: X402_CONFIG.network, token: X402_CONFIG.token, payment_address: X402_CONFIG.paymentAddress }
     });
   }
