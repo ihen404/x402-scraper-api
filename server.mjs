@@ -8,9 +8,7 @@ app.use(express.json());
 
 async function scrapeUrl(url) {
   try {
-    if (!url) {
-      return { error: 'No URL provided' };
-    }
+    if (!url) return { error: 'No URL provided' };
 
     const res = await fetch(url, {
       headers: {
@@ -18,9 +16,7 @@ async function scrapeUrl(url) {
       }
     });
 
-    if (!res.ok) {
-      return { url, error: `HTTP ${res.status}: ${res.statusText}` };
-    }
+    if (!res.ok) return { url, error: `HTTP ${res.status}: ${res.statusText}` };
 
     const html = await res.text();
     const $ = cheerio.load(html);
