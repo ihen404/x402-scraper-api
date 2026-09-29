@@ -1,17 +1,23 @@
 import "dotenv/config";
 import express from "express";
+import { rateLimit } from "express-rate-limit";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
 
-// Configuration for x402 Payment Protocol
+// Trust reverse proxy headers (e.g. Railway, Cloudflare) for accurate IP rate limiting
+app.set("trust proxy", 1);
+
+// Configuration
 const walletAddress =
   process.env.PAYMENT_WALLET_ADDRESS ||
   process.env.payment_wallet_address ||
   process.env.X402_PAYMENT_ADDRESS ||
   "0x0000000000000000000000000000000000000000";
+
+const EXPECTED_API_KEY = process.env.API_KEY || null;
 
 const X402_CONFIG = {
   version: "1.0",
@@ -22,6 +28,40 @@ const X402_CONFIG = {
   pricePerRequestUsd: "0.001",
   token: "USDC"
 };
+
+// Rate Limiter: 60 requests per 1-minute window
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.headers["x-api-key"] || req.ip;
+  },
+  message: {
+    error: "Too Many Requests",
+    message: "Rate limit exceeded. Maximum 60 requests per minute."
+  }
+});
+
+// Middleware: API Key Authentication
+function authenticateApiKey(req, res, next) {
+  if (!EXPECTED_API_KEY) {
+    // If API_KEY environment variable is not set, allow requests through
+    return next();
+  }
+
+  const apiKey = req.headers["x-api-key"] || req.query.apiKey;
+
+  if (!apiKey || apiKey !== EXPECTED_API_KEY) {
+    return res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid or missing 'x-api-key' header."
+    });
+  }
+
+  next();
+}
 
 const mcpServer = new Server(
   { name: "x402-scraper-api", version: "1.0.0" },
@@ -114,6 +154,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
+// Public Health & Metadata Endpoints
 app.get("/", (req, res) => {
   res.status(200).send("x402 Scraper MCP Server is live and healthy");
 });
@@ -150,7 +191,8 @@ app.get("/.well-known/x402", (req, res) => {
   });
 });
 
-app.post("/api/scrape", express.json(), async (req, res) => {
+// Protected Scrape Endpoint
+app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const paymentProof = req.headers["x-402-payment-proof"] || req.headers["authorization"];
 
   if (!paymentProof) {
@@ -187,7 +229,8 @@ app.post("/api/scrape", express.json(), async (req, res) => {
   }
 });
 
-app.get("/mcp", async (req, res) => {
+// MCP Connection Handlers
+app.get("/mcp", apiLimiter, async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
@@ -200,7 +243,7 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-app.post("/messages", express.json(), async (req, res) => {
+app.post("/messages", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
 
