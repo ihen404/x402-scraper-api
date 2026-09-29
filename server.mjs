@@ -3,6 +3,15 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
+// Catch uncaught exceptions to prevent silent crashes
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+
 const app = express();
 
 const mcpServer = new Server(
@@ -54,21 +63,17 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const html = await response.text();
 
-      // Extract title via RegEx
       const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
       const pageTitle = titleMatch ? titleMatch[1].trim() : "No title found";
 
-      // Remove script, style, nav, footer tags
       let cleanHtml = html
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
         .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, " ")
         .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ");
 
-      // Strip remaining HTML tags
       let bodyText = cleanHtml.replace(/<[^>]+>/g, " ");
 
-      // Normalize white space
       bodyText = bodyText
         .split("\n")
         .map(line => line.trim())
@@ -133,7 +138,7 @@ app.post("/messages", express.json(), async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || "3000", 10);
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`MCP Server running on port ${PORT}`);
 });
