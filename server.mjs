@@ -1,8 +1,12 @@
 import express from "express";
-import cheerio from "cheerio";
+import { createRequire } from "module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+
+// Safely require CommonJS modules inside ESM environment
+const require = createRequire(import.meta.url);
+const cheerio = require("cheerio");
 
 const app = express();
 
@@ -54,16 +58,14 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const html = await response.text();
-      // Handle both default import and named load function dynamically
-      const loadFn = cheerio.load || cheerio;
-      const $ = loadFn(html);
+      const $ = cheerio.load(html);
 
-      // Clean out non-content elements
+      // Strip non-content elements
       $("script, style, noscript, iframe, svg, nav, footer").remove();
 
       const pageTitle = $("title").text().trim() || "No title found";
 
-      // Extract main readable body text
+      // Extract main body text
       let bodyText = $("body").text();
 
       bodyText = bodyText
