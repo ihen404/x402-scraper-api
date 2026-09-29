@@ -4,9 +4,16 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
-app.use(express.json());
 
-// Basic health check
+// Apply express.json() ONLY to non-MCP routes so it doesn't lock the request stream
+app.use((req, res, next) => {
+  if (req.path === "/messages") {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+
+// Root route health check
 app.get("/", (req, res) => {
   res.send("x402 Scraper MCP Server is live");
 });
