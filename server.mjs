@@ -32,16 +32,9 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "scrape") {
     const { url } = request.params.arguments || {};
-    try {
-      return {
-        content: [{ type: "text", text: `Successfully received scrape request for ${url}` }]
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Failed to scrape URL ${url}: ${err.message}` }],
-        isError: true
-      };
-    }
+    return {
+      content: [{ type: "text", text: `Successfully connected and received scrape request for ${url}` }]
+    };
   }
   throw new Error(`Tool not found: ${request.params.name}`);
 });
