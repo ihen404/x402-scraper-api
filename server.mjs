@@ -1,5 +1,4 @@
 import express from "express";
-import * as cheerio from "cheerio";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -38,10 +37,11 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     try {
-      console.log(`Scraping URL: ${url}`);
+      console.log(`[Scraper] Fetching URL: ${url}`);
       const response = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
       });
 
@@ -53,18 +53,28 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const html = await response.text();
-      const $ = cheerio.load(html);
 
-      $("script, style, noscript, iframe, svg, nav, footer").remove();
+      // Extract title via RegEx
+      const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const pageTitle = titleMatch ? titleMatch[1].trim() : "No title found";
 
-      const pageTitle = $("title").text().trim() || "No title found";
-      let bodyText = $("body").text();
+      // Remove script, style, nav, footer tags
+      let cleanHtml = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, " ")
+        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, " ");
 
+      // Strip remaining HTML tags
+      let bodyText = cleanHtml.replace(/<[^>]+>/g, " ");
+
+      // Normalize white space
       bodyText = bodyText
         .split("\n")
         .map(line => line.trim())
         .filter(line => line.length > 0)
-        .join("\n");
+        .join("\n")
+        .replace(/ +/g, " ");
 
       const truncatedText = bodyText.slice(0, 10000);
 
@@ -89,7 +99,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("x402 Scraper MCP Server is live");
+  res.status(200).send("x402 Scraper MCP Server is live and healthy");
 });
 
 app.get("/mcp", async (req, res) => {
