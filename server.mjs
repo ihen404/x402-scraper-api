@@ -14,13 +14,23 @@ async function scrapeUrl(url) {
   };
 }
 
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Base route
 app.get('/', (req, res) => {
   res.send('x402 Scraper MCP Server is running');
 });
 
-// MCP JSON-RPC 2.0 Route Handler
-app.post('/mcp', async (req, res) => {
+// MCP JSON-RPC 2.0 Route Handler (matches /mcp and /mcp/)
+app.all(['/mcp', '/mcp/'], async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
+  }
+
   const { jsonrpc, id, method, params } = req.body || {};
 
   if (method === 'initialize') {
