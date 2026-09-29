@@ -127,7 +127,7 @@ app.get("/.well-known/x402", (req, res) => {
     accepted_tokens: [X402_CONFIG.token],
     endpoints: [
       { path: "/mcp", method: "GET", type: "sse", description: "MCP Server-Sent Events transport endpoint" },
-      { path: "/mcp", method: "POST", type: "mcp_rpc", description: "MCP Message RPC endpoint" },
+      { path: "/mcp", method: "POST", type: "mcp_rpc", description: "MCP Streamable HTTP message endpoint" },
       { path: "/api/scrape", method: "POST", type: "http_402", description: "Direct REST HTTP 402 scraping endpoint" }
     ]
   });
@@ -155,13 +155,66 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text });
 });
 
-// MCP SSE Transport Endpoint
+// MCP SSE Endpoint (GET /mcp)
 app.get("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
   transport.onclose = () => transports.delete(transport.sessionId);
   await mcpServer.connect(transport);
+});
+
+// MCP Streamable HTTP / POST Endpoint for Glama Health Checks (POST /mcp)
+app.post("/mcp", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
+  const sessionId = req.query.sessionId;
+  if (sessionId) {
+    const transport = transports.get(sessionId);
+    if (transport) {
+      return await transport.handlePostMessage(req, res, req.body);
+    }
+  }
+
+  // Handle direct JSON-RPC initialization & tool requests from Glama's Streamable HTTP client
+  const { method, id } = req.body || {};
+  if (method === "initialize") {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        serverInfo: { name: "x402-scraper-api", version: "1.0.0" }
+      },
+      id: id || 1
+    });
+  }
+
+  if (method === "tools/list") {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      result: {
+        tools: [
+          {
+            name: "scrape",
+            description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.001 USDC on Base]",
+            inputSchema: {
+              type: "object",
+              properties: {
+                url: { type: "string", description: "Target web URL to scrape" }
+              },
+              required: ["url"]
+            }
+          }
+        ]
+      },
+      id: id || 1
+    });
+  }
+
+  return res.status(200).json({
+    jsonrpc: "2.0",
+    result: {},
+    id: id || 1
+  });
 });
 
 app.post("/messages", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
