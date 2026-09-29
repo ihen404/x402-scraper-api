@@ -30,7 +30,6 @@ const mcpServer = new Server(
 
 const transports = new Map();
 
-// Helper to perform text extraction
 async function scrapeUrl(url) {
   console.log(`[Scraper] Fetching URL: ${url}`);
   const response = await fetch(url, {
@@ -74,7 +73,6 @@ async function scrapeUrl(url) {
   };
 }
 
-// MCP Tools Declaration with x402 Pricing Metadata
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
@@ -116,12 +114,10 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
-// Root Health Check
 app.get("/", (req, res) => {
   res.status(200).send("x402 Scraper MCP Server is live and healthy");
 });
 
-// 1. Agent Discovery Manifest (.well-known/x402)
 app.get("/.well-known/x402", (req, res) => {
   res.status(200).json({
     x402_version: X402_CONFIG.version,
@@ -154,11 +150,9 @@ app.get("/.well-known/x402", (req, res) => {
   });
 });
 
-// 2. Direct REST HTTP 402 Scraping Endpoint
 app.post("/api/scrape", express.json(), async (req, res) => {
   const paymentProof = req.headers["x-402-payment-proof"] || req.headers["authorization"];
 
-  // If no payment proof is provided, trigger the HTTP 402 Handshake
   if (!paymentProof) {
     res.setHeader("X-402-Price-USD", X402_CONFIG.pricePerRequestUsd);
     res.setHeader("X-402-Network", X402_CONFIG.network);
@@ -193,7 +187,6 @@ app.post("/api/scrape", express.json(), async (req, res) => {
   }
 });
 
-// MCP Transport Endpoints
 app.get("/mcp", async (req, res) => {
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
