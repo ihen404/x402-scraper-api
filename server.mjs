@@ -7,12 +7,18 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 const app = express();
 
 // Configuration for x402 Payment Protocol
+const walletAddress =
+  process.env.PAYMENT_WALLET_ADDRESS ||
+  process.env.payment_wallet_address ||
+  process.env.X402_PAYMENT_ADDRESS ||
+  "0x0000000000000000000000000000000000000000";
+
 const X402_CONFIG = {
   version: "1.0",
   name: "x402 Scraper API",
   description: "High-performance web scraping and text extraction service for autonomous AI agents",
   network: "base",
-  paymentAddress: process.env.PAYMENT_WALLET_ADDRESS || process.env.payment_wallet_address || process.env.X402_PAYMENT_ADDRESS || "0x0000000000000000000000000000000000000000",
+  paymentAddress: walletAddress,
   pricePerRequestUsd: "0.001",
   token: "USDC"
 };
