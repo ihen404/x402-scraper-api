@@ -3,15 +3,6 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-// Catch uncaught exceptions to prevent silent crashes
-process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("UNHANDLED REJECTION:", reason);
-});
-
 const app = express();
 
 const mcpServer = new Server(
@@ -138,7 +129,7 @@ app.post("/messages", express.json(), async (req, res) => {
   }
 });
 
-const PORT = parseInt(process.env.PORT || "3000", 10);
-app.listen(PORT, "0.0.0.0", () => {
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
   console.log(`MCP Server running on port ${PORT}`);
 });
