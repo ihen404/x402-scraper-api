@@ -155,8 +155,21 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text });
 });
 
-// MCP Endpoints
-app.get("/mcp", apiLimiter, async (req, res) => {
+// MCP Endpoints supporting Streamable HTTP / Health checks
+app.get("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
+  // If requested as a standard health check or streamable GET, return server capabilities
+  if (req.headers["accept"]?.includes("application/json") || req.query.health === "true") {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        serverInfo: { name: "x402-scraper-api", version: "1.0.0" }
+      },
+      id: 1
+    });
+  }
+
   console.log("New SSE connection requested on /mcp");
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
@@ -168,15 +181,47 @@ app.post("/mcp", apiLimiter, authenticateApiKey, express.json(), async (req, res
   const sessionId = req.query.sessionId;
   
   if (!sessionId) {
-    // Respond successfully to initialization/handshake requests from health checkers
+    // Respond immediately to JSON-RPC initialization or health check pings from Glama
+    const { method, id } = req.body || {};
+    
+    if (method === "initialize") {
+      return res.status(200).json({
+        jsonrpc: "2.0",
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "x402-scraper-api", version: "1.0.0" }
+        },
+        id: id || 1
+      });
+    }
+
+    if (method === "tools/list") {
+      return res.status(200).json({
+        jsonrpc: "2.0",
+        result: {
+          tools: [
+            {
+              name: "scrape",
+              description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.001 USDC on Base]",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  url: { type: "string", description: "Target web URL to scrape" }
+                },
+                required: ["url"]
+              }
+            }
+          ]
+        },
+        id: id || 1
+      });
+    }
+
     return res.status(200).json({
       jsonrpc: "2.0",
-      result: {
-        protocolVersion: "2024-11-05",
-        capabilities: { tools: {} },
-        serverInfo: { name: "x402-scraper-api", version: "1.0.0" }
-      },
-      id: req.body?.id || 1
+      result: {},
+      id: id || 1
     });
   }
 
