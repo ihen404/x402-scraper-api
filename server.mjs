@@ -3,12 +3,12 @@ import express from "express";
 import { rateLimit } from "express-rate-limit";
 import { createPublicClient, http, parseAbiItem } from "viem";
 import { base } from "viem/chains";
+import { LRUCache } from "lru-cache";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
-
 app.set("trust proxy", 1);
 
 const walletAddress =
@@ -18,14 +18,16 @@ const walletAddress =
   "0x0000000000000000000000000000000000000000";
 
 const EXPECTED_API_KEY = process.env.API_KEY || null;
-
-// Base Mainnet USDC Contract Address
 const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-// Initialize Viem public client for Base
 const baseClient = createPublicClient({
   chain: base,
   transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org")
+});
+
+const scrapeCache = new LRUCache({
+  max: 500,
+  ttl: 10 * 60 * 1000, 
 });
 
 const X402_CONFIG = {
@@ -59,15 +61,11 @@ function authenticateApiKey(req, res, next) {
   next();
 }
 
-/**
- * Verifies if a given transaction hash represents a valid USDC transfer on Base to our payment address.
- */
 async function verifyOnChainPayment(txHash) {
   if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) {
     return { valid: false, error: "Invalid transaction hash format" };
   }
 
-  // If wallet address is placeholder, bypass verification in test/dev mode
   if (walletAddress === "0x0000000000000000000000000000000000000000") {
     console.warn("[x402] Warning: Using zero address wallet. Bypassing on-chain check.");
     return { valid: true };
@@ -79,23 +77,16 @@ async function verifyOnChainPayment(txHash) {
       return { valid: false, error: "Transaction failed or not found on Base" };
     }
 
-    // Parse Transfer logs for USDC contract
-    const transferEventSig = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
-    
     let verified = false;
     for (const log of txReceipt.logs) {
       if (log.address.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase()) {
         try {
-          // Check topics or decode if matches Transfer event
-          // Topics: [eventSig, indexed from, indexed to]
           const toAddress = `0x${log.topics[2]?.slice(26)}`.toLowerCase();
           if (toAddress === walletAddress.toLowerCase()) {
             verified = true;
             break;
           }
-        } catch (e) {
-          // ignore parsing error for non-matching logs
-        }
+        } catch (e) {}
       }
     }
 
@@ -198,7 +189,10 @@ app.get("/.well-known/x402", (req, res) => {
 
 app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (req, res) => {
   const paymentProof = req.headers["x-402-payment-proof"] || req.headers["authorization"];
+  const { url } = req.body || {};
   
+  if (!url) return res.status(400).json({ error: "Missing 'url' parameter in JSON body" });
+
   if (!paymentProof) {
     res.setHeader("X-402-Price-USD", X402_CONFIG.pricePerRequestUsd);
     res.setHeader("X-402-Network", X402_CONFIG.network);
@@ -211,7 +205,12 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
     });
   }
 
-  // Verify on-chain transaction hash
+  const cacheKey = `${paymentProof}:${url}`;
+  if (scrapeCache.has(cacheKey)) {
+    console.log(`[Cache] Returning cached result for idempotent request: ${url}`);
+    return res.status(200).json({ url, result: scrapeCache.get(cacheKey), cached: true });
+  }
+
   const verification = await verifyOnChainPayment(paymentProof);
   if (!verification.valid) {
     return res.status(402).json({
@@ -221,15 +220,13 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
     });
   }
 
-  const { url } = req.body || {};
-  if (!url) return res.status(400).json({ error: "Missing 'url' parameter in JSON body" });
-
   const result = await scrapeUrl(url);
   if (result.isError) return res.status(502).json({ error: result.text });
-  return res.status(200).json({ url, result: result.text });
+
+  scrapeCache.set(cacheKey, result.text);
+  return res.status(200).json({ url, result: result.text, cached: false });
 });
 
-// Native Streamable HTTP Endpoint with per-request server isolation
 app.all("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
   try {
     const server = createMcpServer();
