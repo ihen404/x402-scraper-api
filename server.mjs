@@ -1,20 +1,53 @@
 import express from 'express';
+import * as cheerio from 'cheerio';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Helper scrape function
+// Production scrape function using fetch + cheerio
 async function scrapeUrl(url) {
-  return {
-    url,
-    title: "Example Title",
-    content: "Scraped content placeholder from production endpoint"
-  };
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Remove unneeded element tags
+    $('script, style, noscript, nav, header, footer, svg, iframe').remove();
+
+    const title = $('title').text().trim() \vert{}\vert{}$('h1').first().text().trim() || 'No Title Found';
+    
+    // Extract main text content
+    const textContent = $('body')
+      .text()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      url,
+      title,
+      content: textContent.substring(0, 10000), // Cap payload length
+      status: response.status
+    };
+  } catch (error) {
+    return {
+      url,
+      error: error.message
+    };
+  }
 }
 
-// Logging middleware
+// Request logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
@@ -25,7 +58,7 @@ app.get('/', (req, res) => {
   res.send('x402 Scraper MCP Server is running');
 });
 
-// MCP JSON-RPC 2.0 Route Handler (matches /mcp and /mcp/)
+// MCP JSON-RPC 2.0 Route Handler
 app.all(['/mcp', '/mcp/'], async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
@@ -53,7 +86,7 @@ app.all(['/mcp', '/mcp/'], async (req, res) => {
         tools: [
           {
             name: 'scrape',
-            description: 'Scrape content from a given URL',
+            description: 'Scrape and extract clean text content from a given web URL',
             inputSchema: {
               type: 'object',
               properties: {
