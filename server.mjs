@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -11,7 +12,7 @@ const X402_CONFIG = {
   name: "x402 Scraper API",
   description: "High-performance web scraping and text extraction service for autonomous AI agents",
   network: "base",
-  paymentAddress: process.env.X402_PAYMENT_ADDRESS || "0x0000000000000000000000000000000000000000",
+  paymentAddress: process.env.PAYMENT_WALLET_ADDRESS || process.env.payment_wallet_address || process.env.X402_PAYMENT_ADDRESS || "0x0000000000000000000000000000000000000000",
   pricePerRequestUsd: "0.001",
   token: "USDC"
 };
