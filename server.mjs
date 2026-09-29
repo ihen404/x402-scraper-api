@@ -1,5 +1,5 @@
 import express from "express";
-import * as cheerio from "cheerio";
+import cheerio from "cheerio";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -54,9 +54,11 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const html = await response.text();
-      const $ = cheerio.load(html);
+      // Handle both default import and named load function dynamically
+      const loadFn = cheerio.load || cheerio;
+      const $ = loadFn(html);
 
-      // Clean out scripts, styles, and non-content elements
+      // Clean out non-content elements
       $("script, style, noscript, iframe, svg, nav, footer").remove();
 
       const pageTitle = $("title").text().trim() || "No title found";
@@ -64,14 +66,12 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Extract main readable body text
       let bodyText = $("body").text();
 
-      // Normalize whitespace/newlines
       bodyText = bodyText
         .split("\n")
         .map(line => line.trim())
         .filter(line => line.length > 0)
         .join("\n");
 
-      // Limit response payload size (~10,000 chars) for agent efficiency
       const truncatedText = bodyText.slice(0, 10000);
 
       return {
