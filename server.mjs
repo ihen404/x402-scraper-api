@@ -6,44 +6,40 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Production scrape function using fetch + cheerio
+// Robust URL scraping helper
 async function scrapeUrl(url) {
   try {
-    const response = await fetch(url, {
+    if (!url) {
+      return { error: 'No URL provided' };
+    }
+
+    const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!res.ok) {
+      return { url, error: `HTTP ${res.status}: ${res.statusText}` };
     }
 
-    const html = await response.text();
+    const html = await res.text();
     const $ = cheerio.load(html);
 
-    // Remove unneeded element tags
+    // Strip clutter elements
     $('script, style, noscript, nav, header, footer, svg, iframe').remove();
 
     const title = $('title').text().trim() \vert{}\vert{}$('h1').first().text().trim() || 'No Title Found';
-    
-    // Extract main text content
-    const textContent = $('body')
-      .text()
-      .replace(/\s+/g, ' ')
-      .trim();
+    const textContent = $('body').text().replace(/\s+/g, ' ').trim();
 
     return {
       url,
       title,
-      content: textContent.substring(0, 10000), // Cap payload length
-      status: response.status
+      content: textContent.substring(0, 5000),
+      status: res.status
     };
-  } catch (error) {
-    return {
-      url,
-      error: error.message
-    };
+  } catch (err) {
+    return { url, error: err.message };
   }
 }
 
@@ -53,15 +49,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Base route
+// Root endpoint
 app.get('/', (req, res) => {
-  res.send('x402 Scraper MCP Server is running');
+  res.send('x402 Scraper MCP Server is live');
 });
 
-// MCP JSON-RPC 2.0 Route Handler
+// MCP JSON-RPC handler
 app.all(['/mcp', '/mcp/'], async (req, res) => {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   const { jsonrpc, id, method, params } = req.body || {};
@@ -123,6 +119,6 @@ app.all(['/mcp', '/mcp/'], async (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
 });
