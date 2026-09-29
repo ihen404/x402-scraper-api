@@ -1,4 +1,5 @@
 import express from "express";
+import * as cheerio from "cheerio";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -16,11 +17,11 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "scrape",
-      description: "Scrape and extract text content from a given web URL",
+      description: "Scrape, parse, and extract clean text content from a given web URL",
       inputSchema: {
         type: "object",
         properties: {
-          url: { type: "string", description: "Target URL to scrape" }
+          url: { type: "string", description: "Target web URL to scrape" }
         },
         required: ["url"]
       }
@@ -31,10 +32,65 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "scrape") {
     const { url } = request.params.arguments || {};
-    return {
-      content: [{ type: "text", text: `Scrape request received for URL: ${url}` }]
-    };
+
+    if (!url) {
+      throw new Error("URL argument is required");
+    }
+
+    try {
+      console.log(`Scraping URL: ${url}`);
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+      });
+
+      if (!response.ok) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `HTTP Error ${response.status}: ${response.statusText}` }]
+        };
+      }
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      // Clean out scripts, styles, and non-content elements
+      $("script, style, noscript, iframe, svg, nav, footer").remove();
+
+      const pageTitle = $("title").text().trim() || "No title found";
+
+      // Extract main readable body text
+      let bodyText = $("body").text();
+
+      // Normalize whitespace/newlines
+      bodyText = bodyText
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join("\n");
+
+      // Limit response payload size (~10,000 chars) for agent efficiency
+      const truncatedText = bodyText.slice(0, 10000);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `TITLE: ${pageTitle}\nURL: ${url}\n\nCONTENT:\n${truncatedText}${bodyText.length > 10000 ? "\n\n[Content truncated...]" : ""}`
+          }
+        ]
+      };
+    } catch (err) {
+      console.error(`Error scraping ${url}:`, err);
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Scraping failed: ${err.message}` }]
+      };
+    }
   }
+
   throw new Error(`Tool not found: ${request.params.name}`);
 });
 
@@ -55,7 +111,6 @@ app.get("/mcp", async (req, res) => {
   await mcpServer.connect(transport);
 });
 
-// Use express.json() to parse the body into req.body and pass it explicitly to handlePostMessage
 app.post("/messages", express.json(), async (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = transports.get(sessionId);
