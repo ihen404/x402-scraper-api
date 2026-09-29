@@ -154,9 +154,16 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
 
 // Native Streamable HTTP Endpoint for Glama
 app.all("/mcp", apiLimiter, authenticateApiKey, async (req, res) => {
-  const transport = new StreamableHTTPServerTransport();
-  await mcpServer.connect(transport);
-  await transport.handleRequest(req, res);
+  try {
+    const transport = new StreamableHTTPServerTransport();
+    await mcpServer.connect(transport);
+    await transport.handleRequest(req, res);
+  } catch (error) {
+    console.error("Error handling Streamable HTTP request on /mcp:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal Server Error", message: error.message });
+    }
+  }
 });
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
