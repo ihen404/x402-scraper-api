@@ -1,12 +1,8 @@
 import express from "express";
-import { createRequire } from "module";
+import * as cheerio from "cheerio";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-
-// Safely require CommonJS modules inside ESM environment
-const require = createRequire(import.meta.url);
-const cheerio = require("cheerio");
 
 const app = express();
 
@@ -45,8 +41,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       console.log(`Scraping URL: ${url}`);
       const response = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
@@ -60,12 +55,9 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       const html = await response.text();
       const $ = cheerio.load(html);
 
-      // Strip non-content elements
       $("script, style, noscript, iframe, svg, nav, footer").remove();
 
       const pageTitle = $("title").text().trim() || "No title found";
-
-      // Extract main body text
       let bodyText = $("body").text();
 
       bodyText = bodyText
