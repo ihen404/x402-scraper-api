@@ -10,7 +10,7 @@
   },
   "remotes": [
     {
-      "type": "sse",
+      "type": "streamable-http",
       "url": "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
     }
   ]
