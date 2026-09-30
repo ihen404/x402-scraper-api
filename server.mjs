@@ -227,6 +227,8 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text, cached: false });
 });
 
+app.post("/", apiLimiter, async (req, res) => { req.url = "/mcp"; return app._router.handle(req, res); });
+
 app.all("/mcp", apiLimiter, async (req, res) => {
   try {
     const server = createMcpServer();
