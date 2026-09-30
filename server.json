@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.modelcontextprotocol.anonymous/x402-scraper-api",
+  "name": "io.github.ihen404/x402-scraper-api",
   "version": "1.0.0",
   "title": "x402 Scraper API",
   "description": "Programmatic web-scraping MCP server powered by x402 micro-transactions on Base.",
