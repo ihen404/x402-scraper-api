@@ -5,6 +5,7 @@
   "title": "x402 Scraper API",
   "description": "Programmatic web-scraping MCP server powered by x402 micro-transactions on Base.",
   "repository": {
+    "source": "github",
     "url": "https://github.com/ihen404/x402-scraper-api"
   },
   "remotes": [
