@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json.schemastore.org/mcp-server.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10",
   "name": "io.github.ihen404/x402-scraper-api",
   "version": "1.0.0",
   "title": "x402 Scraper API",
