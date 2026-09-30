@@ -13,3 +13,5 @@ Programmatic web-scraping MCP server powered by x402 micro-transactions on Base.
   }
 }
 ```
+
+- [x402-scraper-api](https://github.com/ihen404/x402-scraper-api) - High-performance web scraping and text extraction MCP service, fee-gated with on-chain USDC micro-payments on Base.
