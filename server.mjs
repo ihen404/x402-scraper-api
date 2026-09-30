@@ -156,10 +156,24 @@ function createMcpServer() {
     ]
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, context) => {
     if (request.params.name === "scrape") {
       const { url } = request.params.arguments || {};
       if (!url) throw new Error("URL argument is required");
+
+      const paymentProof = context?.headers?.["x-402-payment-proof"] || context?.headers?.["x-payment-tx"];
+      
+      if (!paymentProof && walletAddress !== "0x0000000000000000000000000000000000000000") {
+        throw new Error("Payment Required: Missing payment header. Send $0.001 USDC on Base to " + walletAddress);
+      }
+
+      if (paymentProof) {
+        const verification = await verifyOnChainPayment(paymentProof);
+        if (!verification.valid) {
+          throw new Error(`Invalid Payment Proof: ${verification.error}`);
+        }
+      }
+
       const result = await scrapeUrl(url);
       return { isError: result.isError, content: [{ type: "text", text: result.text }] };
     }
