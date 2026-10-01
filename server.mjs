@@ -9,6 +9,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
+
+app.use((req, res, next) => {
+  if (req.url.includes('/mcp](https://')) {
+    req.url = '/mcp';
+  }
+  next();
+});
 app.set("trust proxy", 1);
 
 const walletAddress =
