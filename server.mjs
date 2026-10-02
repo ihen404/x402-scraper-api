@@ -274,7 +274,76 @@ const handleMcpTransport = async (req, res) => {
   }
 };
 
+
+// Structured Data Extraction Endpoint for Agents
+app.post("/api/extract", authenticateApiKey, express.json(), async (req, res) => {
+  try {
+    const { url, schema, instruction } = req.body;
+    if (!url || !schema) {
+      return res.status(400).json({ error: "Bad Request", message: "Both 'url' and 'schema' are required in the request body." });
+    }
+
+    // 1. Fetch raw page content using the internal scraping mechanism
+    // Reusing standard fetch or scraper logic present in the app
+    const scrapeResponse = await fetch(url, {
+      headers: { "User-Agent": "x402-Agent-Scraper/1.0" }
+    });
+    const htmlText = await scrapeResponse.text();
+
+    // Simple HTML to text truncation fallback if needed
+    const cleanedText = htmlText.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().slice(0, 15000);
+
+    // 2. Enforce structured extraction using OpenAI API if OPENAI_API_KEY is available
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Configuration Error", message: "OPENAI_API_KEY is not configured on the server." });
+    }
+
+    const prompt = `Extract structured data from the following text based on this JSON Schema: ${JSON.stringify(schema)}. 
+    Instruction: ${instruction || "Extract all requested fields accurately."}
+    
+    Text content:
+    ${cleanedText}
+    
+    Return ONLY a valid JSON object matching the schema.`;
+
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const aiData = await aiRes.json();
+    if (!aiData.choices || aiData.choices.length === 0) {
+      throw new Error("Failed to generate structured extraction from LLM.");
+    }
+
+    const parsedData = JSON.parse(aiData.choices[0].message.content);
+
+    res.json({
+      success: true,
+      url,
+      data: parsedData,
+      metadata: {
+        extractedAt: new Date().toISOString(),
+        costUsdc: "0.0015"
+      }
+    });
+  } catch (error) {
+    console.error("Extraction error:", error);
+    res.status(500).json({ error: "Extraction Failed", message: error.message });
+  }
+});
+
 app.post("/", handleMcpTransport);
+
 app.get("/mcp", handleMcpTransport);
 
 
