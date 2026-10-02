@@ -235,6 +235,10 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
   }
 });
 
+
+app.post("/", handleMcpTransport);
+app.post("/mcp", handleMcpTransport);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`x402-scraper-api running on port ${PORT}`);
