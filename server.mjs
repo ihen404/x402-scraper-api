@@ -57,16 +57,12 @@ const X402_CONFIG = {
 };
 
 const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.headers["x-api-key"] || req.ip,
-  message: {
-    error: "Too Many Requests",
-    message: "Rate limit exceeded. Maximum 60 requests per minute."
-  }
-});
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too Many Requests", message: "Rate limit exceeded. Maximum 300 requests per minute." }
+  });
 
 function authenticateApiKey(req, res, next) {
   if (!EXPECTED_API_KEY) return next();
