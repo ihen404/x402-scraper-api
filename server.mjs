@@ -342,7 +342,79 @@ app.post("/api/extract", authenticateApiKey, express.json(), async (req, res) =>
   }
 });
 
+
+// Deep Crawling & Pagination Endpoint for Agents
+app.post("/api/crawl", authenticateApiKey, express.json(), async (req, res) => {
+  try {
+    const { url, maxDepth = 2, maxPages = 5 } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
+    }
+
+    const visited = new Set();
+    const results = [];
+    const queue = [{ url, depth: 1 }];
+
+    while (queue.length > 0 && results.length < maxPages) {
+      const { url: currentUrl, depth } = queue.shift();
+      
+      if (visited.has(currentUrl)) continue;
+      visited.add(currentUrl);
+
+      try {
+        const response = await fetch(currentUrl, {
+          headers: { "User-Agent": "x402-Agent-Scraper/1.0" }
+        });
+        const html = await response.text();
+        const cleanText = html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
+
+        results.push({
+          url: currentUrl,
+          depth,
+          content: cleanText
+        });
+
+        // If we haven't hit max depth, extract relative/absolute links
+        if (depth < maxDepth) {
+          const linkRegex = /href="([^"#]+)"/g;
+          let match;
+          const baseUrl = new URL(currentUrl);
+
+          while ((match = linkRegex.exec(html)) !== null && queue.length + results.length < maxPages) {
+            let foundUrl = match[1];
+            try {
+              const absoluteUrl = new URL(foundUrl, baseUrl).href;
+              if (absoluteUrl.startsWith(baseUrl.origin) && !visited.has(absoluteUrl)) {
+                queue.push({ url: absoluteUrl, depth: depth + 1 });
+              }
+            } catch (e) {
+              // Ignore invalid URL formatting
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to crawl ${currentUrl}:`, err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      seedUrl: url,
+      pagesCrawled: results.length,
+      data: results,
+      metadata: {
+        crawledAt: new Date().toISOString(),
+        costUsdc: "0.0050"
+      }
+    });
+  } catch (error) {
+    console.error("Crawl error:", error);
+    res.status(500).json({ error: "Crawl Failed", message: error.message });
+  }
+});
+
 app.post("/", handleMcpTransport);
+
 
 app.get("/mcp", handleMcpTransport);
 
