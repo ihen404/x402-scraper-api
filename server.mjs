@@ -57,6 +57,11 @@ const X402_CONFIG = {
 };
 
 const apiLimiter = rateLimit({
+  skip: (req) => {
+    const ua = req.headers['user-agent'] || '';
+    // Skip rate limiting for Glama, MCP inspectors, and common test agents
+    return ua.includes('Glama') || ua.includes('MCP') || ua.includes('curl') || ua.includes('Postman');
+  },
     windowMs: 60 * 1000,
     max: 300,
     standardHeaders: true,
