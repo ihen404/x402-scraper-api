@@ -294,3 +294,16 @@ app.all(/^\/mcp\]\(https:\/\//, (req, res) => {
   req.url = "/mcp";
   return app._router.handle(req, res);
 });
+
+
+// Glama auto-discovery manifest
+app.get('/.well-known/glama.json', (req, res) => {
+  res.json({
+    "name": "x402-scraper-api",
+    "description": "MCP Scraper API with USDC microtransactions on Base",
+    "transport": {
+      "type": "streamable-http",
+      "url": "https://x402-scraper-api-production-67a4.up.railway.app/"
+    }
+  });
+});
