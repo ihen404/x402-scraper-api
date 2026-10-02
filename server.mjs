@@ -175,7 +175,9 @@ const handleMcpTransport = (req, res) => {
   res.json({ jsonrpc: "2.0", result: { status: "active", capabilities: ["extract", "crawl", "render"] }, id: req.body.id || 1 });
 };
 
+// Model Context Protocol (MCP) Transport Handlers
 app.post("/", handleMcpTransport);
+app.post("/mcp", handleMcpTransport);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
