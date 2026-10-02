@@ -14,6 +14,9 @@ app.use((req, res, next) => {
   // Force-inject required accept headers globally for any MCP client / test runner
   if (req.path === '/' || req.path === '/mcp' || req.path.startsWith('/mcp')) {
     req.headers['accept'] = 'application/json, text/event-stream';
+    if (!req.headers['content-type']) {
+      req.headers['content-type'] = 'application/json';
+    }
   }
 
   if (req.url.includes('/mcp](https://')) {
