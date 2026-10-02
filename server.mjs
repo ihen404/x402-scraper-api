@@ -270,11 +270,11 @@ const handleMcpTransport = async (req, res) => {
   return app._router.handle(req, res);
 };
 
-app.post("/", apiLimiter, handleMcpTransport);
-app.get("/mcp", apiLimiter, handleMcpTransport);
+app.post("/", handleMcpTransport);
+app.get("/mcp", handleMcpTransport);
 
 
-app.all("/mcp", apiLimiter, async (req, res) => {
+app.all("/mcp", async (req, res) => {
   try {
     const server = createMcpServer();
     const transport = new StreamableHTTPServerTransport();
