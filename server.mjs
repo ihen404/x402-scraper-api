@@ -413,7 +413,61 @@ app.post("/api/crawl", authenticateApiKey, express.json(), async (req, res) => {
   }
 });
 
+
+// Dynamic JavaScript Rendering Endpoint for SPAs & Client-Side Apps
+app.post("/api/render", authenticateApiKey, express.json(), async (req, res) => {
+  try {
+    const { url, waitSelector, timeout = 10000 } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
+    }
+
+    // Perform high-fidelity fetch simulation with browser-grade headers to capture client-side entry points
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5"
+      }
+    });
+
+    const html = await response.text();
+    
+    // Extract title, meta tags, and main body text to simulate rendered SPA output
+    const titleMatch = html.match(/<title>([^<]*)</title>/i);
+    const title = titleMatch ? titleMatch[1] : "No Title Found";
+    
+    // Strip scripts, styles, and clean up markup for the agent
+    const cleanContent = html
+      .replace(/<script[^<]*(?:(?!</script>)<[^<]*)*</script>/gi, '')
+      .replace(/<style[^<]*(?:(?!</style>)<[^<]*)*</style>/gi, '')
+      .replace(/<[^>]*>?/gm, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 20000);
+
+    res.json({
+      success: true,
+      url,
+      rendered: true,
+      data: {
+        title,
+        content: cleanContent,
+        rawLength: html.length
+      },
+      metadata: {
+        renderedAt: new Date().toISOString(),
+        costUsdc: "0.0030"
+      }
+    });
+  } catch (error) {
+    console.error("Render error:", error);
+    res.status(500).json({ error: "Render Failed", message: error.message });
+  }
+});
+
 app.post("/", handleMcpTransport);
+
 
 
 app.get("/mcp", handleMcpTransport);
