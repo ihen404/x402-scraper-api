@@ -434,7 +434,7 @@ app.post("/api/render", authenticateApiKey, express.json(), async (req, res) => 
     const html = await response.text();
     
     // Extract title, meta tags, and main body text to simulate rendered SPA output
-    const titleMatch = html.match(/<title>([^<]*)</title>/i);
+    const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
     const title = titleMatch ? titleMatch[1] : "No Title Found";
     
     // Strip scripts, styles, and clean up markup for the agent
