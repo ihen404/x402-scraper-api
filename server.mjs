@@ -11,6 +11,11 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 const app = express();
 
 app.use((req, res, next) => {
+  // Force-inject required accept headers globally for any MCP client / test runner
+  if (req.path === '/' || req.path === '/mcp' || req.path.startsWith('/mcp')) {
+    req.headers['accept'] = 'application/json, text/event-stream';
+  }
+
   if (req.url.includes('/mcp](https://')) {
     req.url = '/mcp';
   }
