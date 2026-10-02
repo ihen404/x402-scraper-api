@@ -77,7 +77,7 @@ const handleMcpTransport = async (req, res) => {
       endpoint: "/mcp"
     });
     await mcpServer.connect(transport);
-    await transport.handlePostMessage(req, res);
+    await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("MCP Transport Error:", error);
     if (!res.headersSent) {
