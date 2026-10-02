@@ -259,15 +259,19 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
 });
 
 
-// Handle root POST and /mcp requests uniformly for Streamable HTTP transport
+// Direct unified MCP transport handler
 const handleMcpTransport = async (req, res) => {
-  // Ensure the MCP transport accepts text/event-stream and application/json for compatibility with Glama/Smithery test runners
-  const accept = req.headers['accept'] || '';
-  if (!accept.includes('text/event-stream') || !accept.includes('application/json')) {
-    req.headers['accept'] = 'application/json, text/event-stream';
+  try {
+    const server = createMcpServer();
+    const transport = new StreamableHTTPServerTransport();
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  } catch (error) {
+    console.error("Error handling Streamable HTTP request on MCP transport:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal Server Error", message: error.message });
+    }
   }
-  req.url = "/mcp";
-  return app._router.handle(req, res);
 };
 
 app.post("/", handleMcpTransport);
