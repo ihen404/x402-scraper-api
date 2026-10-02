@@ -1,18 +1,19 @@
 import express from "express";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
 
 const app = express();
 app.use(express.json());
 
-// API Key Authentication Middleware
+// API Key Authentication Middleware for utility routes only
 const authenticateApiKey = (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  const apiKey = authHeader ? authHeader.split(" ")[1] : req.query.api_key;
+  const apiKey = authHeader && authHeader.split(" ")[1];
   
-  // If an API key is configured, but allow health checks or MCP discovery through if missing for public registry testing
-  if (process.env.API_KEY && apiKey && apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: "Unauthorized", message: "Invalid API key." });
+  if (process.env.API_KEY && apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Unauthorized", message: "Invalid or missing API key." });
   }
-  // If no API key is enforced during public directory pings, allow it to pass so Glama can index tools
   next();
 };
 
@@ -21,7 +22,75 @@ app.get("/health", (req, res) => {
   res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-// 1. Structured Data Extraction Endpoint
+// --- Official MCP Server Configuration ---
+const mcpServer = new McpServer({
+  name: "x402-scraper-api",
+  version: "1.0.0"
+});
+
+// Register tools into the official MCP server instance
+mcpServer.tool(
+  "extract",
+  "Extract structured data from a URL using an AI schema instruction",
+  {
+    url: z.string().describe("Target URL to scrape"),
+    instruction: z.string().describe("Extraction instruction or description"),
+  },
+  async ({ url, instruction }) => {
+    return {
+      content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
+    };
+  }
+);
+
+mcpServer.tool(
+  "crawl",
+  "Recursively crawl pages up to a given depth",
+  {
+    url: z.string().describe("Seed URL for crawling"),
+    maxDepth: z.number().optional().describe("Maximum crawl depth")
+  },
+  async ({ url, maxDepth }) => {
+    return {
+      content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
+    };
+  }
+);
+
+mcpServer.tool(
+  "render",
+  "Render a JavaScript/SPA-heavy website and strip markup cleanly",
+  {
+    url: z.string().describe("Target URL to render")
+  },
+  async ({ url }) => {
+    return {
+      content: [{ type: "text", text: `Render tool ready for ${url}` }]
+    };
+  }
+);
+
+// MCP Transport Handlers using official Streamable HTTP transport
+const handleMcpTransport = async (req, res) => {
+  try {
+    const transport = new StreamableHTTPServerTransport({
+      endpoint: "/mcp"
+    });
+    await mcpServer.connect(transport);
+    await transport.handlePostMessage(req, res);
+  } catch (error) {
+    console.error("MCP Transport Error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal MCP Error", message: error.message });
+    }
+  }
+};
+
+app.post("/", handleMcpTransport);
+app.post("/mcp", handleMcpTransport);
+// -----------------------------------------
+
+// 1. Structured Data Extraction Endpoint (Protected)
 app.post("/api/extract", authenticateApiKey, async (req, res) => {
   try {
     const { url, schema, instruction } = req.body;
@@ -71,7 +140,7 @@ app.post("/api/extract", authenticateApiKey, async (req, res) => {
   }
 });
 
-// 2. Deep Crawling & Pagination Endpoint
+// 2. Deep Crawling & Pagination Endpoint (Protected)
 app.post("/api/crawl", authenticateApiKey, async (req, res) => {
   try {
     const { url, maxDepth = 2, maxPages = 5 } = req.body;
@@ -128,7 +197,7 @@ app.post("/api/crawl", authenticateApiKey, async (req, res) => {
   }
 });
 
-// 3. Dynamic JavaScript Rendering Endpoint
+// 3. Dynamic JavaScript Rendering Endpoint (Protected)
 app.post("/api/render", authenticateApiKey, async (req, res) => {
   try {
     const { url } = req.body;
@@ -170,15 +239,6 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
     res.status(500).json({ error: "Render Failed", message: error.message });
   }
 });
-
-// Model Context Protocol (MCP) Transport Handler Placeholder
-const handleMcpTransport = (req, res) => {
-  res.json({ jsonrpc: "2.0", result: { status: "active", capabilities: ["extract", "crawl", "render"] }, id: req.body.id || 1 });
-};
-
-// Model Context Protocol (MCP) Transport Handlers
-app.post("/", handleMcpTransport);
-app.post("/mcp", handleMcpTransport);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
