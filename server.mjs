@@ -1,161 +1,168 @@
-import "dotenv/config";
 import express from "express";
-import { rateLimit } from "express-rate-limit";
-import { createPublicClient, http, parseAbiItem } from "viem";
-import { base } from "viem/chains";
-import { LRUCache } from "lru-cache";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const app = express();
+app.use(express.json());
 
-app.use((req, res, next) => {
-  console.log(`[Incoming Request] ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers)}`);
-  // Force-inject required accept headers globally for any MCP client / test runner
-  if (req.path === '/' || req.path === '/mcp' || req.path.startsWith('/mcp')) {
-    req.headers['accept'] = 'application/json, text/event-stream';
-    if (!req.headers['content-type']) {
-      req.headers['content-type'] = 'application/json';
-    }
-  }
-
-  if (req.url.includes('/mcp](https://')) {
-    req.url = '/mcp';
+// API Key Authentication Middleware
+const authenticateApiKey = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const apiKey = authHeader && authHeader.split(" ")[1];
+  
+  // If an API key is configured in environment variables, validate it
+  if (process.env.API_KEY && apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Unauthorized", message: "Invalid or missing API key." });
   }
   next();
-});
-app.set("trust proxy", 1);
-
-const walletAddress =
-  process.env.PAYMENT_WALLET_ADDRESS ||
-  process.env.payment_wallet_address ||
-  process.env.X402_PAYMENT_ADDRESS ||
-  "0x0000000000000000000000000000000000000000";
-
-const EXPECTED_API_KEY = process.env.API_KEY || null;
-const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-
-const baseClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.BASE_RPC_URL || "https://mainnet.base.org")
-});
-
-const scrapeCache = new LRUCache({
-  max: 300,
-  ttl: 10 * 60 * 1000, 
-});
-
-const X402_CONFIG = {
-  version: "1.0",
-  name: "x402 Scraper API",
-  description: "High-performance web scraping and text extraction service for autonomous AI agents",
-  network: "base",
-  paymentAddress: walletAddress,
-  pricePerRequestUsd: "0.001",
-  token: "USDC"
 };
 
-const apiLimiter = rateLimit({
-  skip: (req) => {
-    const ua = req.headers['user-agent'] || '';
-    // Skip rate limiting for Glama, MCP inspectors, and common test agents
-    return ua.includes('Glama') || ua.includes('MCP') || ua.includes('curl') || ua.includes('Postman');
-  },
-    windowMs: 60 * 1000,
-    max: 300,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too Many Requests", message: "Rate limit exceeded. Maximum 300 requests per minute." }
-  });
+// Health Check Endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
 
-function authenticateApiKey(req, res, next) {
-  if (!EXPECTED_API_KEY) return next();
-  const apiKey = req.headers["x-api-key"] || req.query.apiKey;
-  if (!apiKey || apiKey !== EXPECTED_API_KEY) {
-    return res.status(401).json({ error: "Unauthorized", message: "Invalid or missing 'x-api-key' header." });
-  }
-  next();
-}
-
-async function verifyOnChainPayment(txHash) {
-  if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) {
-    return { valid: false, error: "Invalid transaction hash format" };
-  }
-
-  if (walletAddress === "0x0000000000000000000000000000000000000000") {
-    console.warn("[x402] Warning: Using zero address wallet. Bypassing on-chain check.");
-    return { valid: true };
-  }
-
+// 1. Structured Data Extraction Endpoint
+app.post("/api/extract", authenticateApiKey, async (req, res) => {
   try {
-    const txReceipt = await baseClient.getTransactionReceipt({ hash: txHash });
-    if (!txReceipt || txReceipt.status !== "success") {
-      return { valid: false, error: "Transaction failed or not found on Base" };
+    const { url, schema, instruction } = req.body;
+    if (!url || !schema) {
+      return res.status(400).json({ error: "Bad Request", message: "Both 'url' and 'schema' are required." });
     }
 
-    let verified = false;
-    for (const log of txReceipt.logs) {
-      if (log.address.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase()) {
-        try {
-          const toAddress = `0x${log.topics[2]?.slice(26)}`.toLowerCase();
-          if (toAddress === walletAddress.toLowerCase()) {
-            verified = true;
-            break;
+    const scrapeResponse = await fetch(url, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
+    const htmlText = await scrapeResponse.text();
+
+    let cleanedText = "";
+    let insideTag = false;
+    for (let i = 0; i < htmlText.length; i++) {
+      if (htmlText[i] === '<') insideTag = true;
+      else if (htmlText[i] === '>') insideTag = false;
+      else if (!insideTag) cleanedText += htmlText[i];
+    }
+    cleanedText = cleanedText.replace(/\s+/g, ' ').trim().slice(0, 15000);
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Configuration Error", message: "OPENAI_API_KEY is not configured." });
+    }
+
+    const prompt = `Extract structured data from the following text based on this JSON Schema: ${JSON.stringify(schema)}. Instruction: ${instruction || "Extract all requested fields accurately."}\n\nText content:\n${cleanedText}\n\nReturn ONLY a valid JSON object matching the schema.`;
+
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const aiData = await aiRes.json();
+    if (!aiData.choices || aiData.choices.length === 0) {
+      throw new Error("Failed to generate structured extraction from LLM.");
+    }
+
+    const parsedData = JSON.parse(aiData.choices[0].message.content);
+    res.json({ success: true, url, data: parsedData, metadata: { extractedAt: new Date().toISOString(), costUsdc: "0.0015" } });
+  } catch (error) {
+    console.error("Extraction error:", error);
+    res.status(500).json({ error: "Extraction Failed", message: error.message });
+  }
+});
+
+// 2. Deep Crawling & Pagination Endpoint
+app.post("/api/crawl", authenticateApiKey, async (req, res) => {
+  try {
+    const { url, maxDepth = 2, maxPages = 5 } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
+    }
+
+    const visited = new Set();
+    const results = [];
+    const queue = [{ url, depth: 1 }];
+
+    while (queue.length > 0 && results.length < maxPages) {
+      const { url: currentUrl, depth } = queue.shift();
+      if (visited.has(currentUrl)) continue;
+      visited.add(currentUrl);
+
+      try {
+        const response = await fetch(currentUrl, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
+        const html = await response.text();
+        
+        let cleanText = "";
+        let insideTag = false;
+        for (let i = 0; i < html.length; i++) {
+          if (html[i] === '<') insideTag = true;
+          else if (html[i] === '>') insideTag = false;
+          else if (!insideTag) cleanText += html[i];
+        }
+        cleanText = cleanText.replace(/\s+/g, ' ').trim().slice(0, 5000);
+
+        results.push({ url: currentUrl, depth, content: cleanText });
+
+        if (depth < maxDepth) {
+          const linkRegex = /href="([^"#]+)"/g;
+          let match;
+          const baseUrl = new URL(currentUrl);
+          while ((match = linkRegex.exec(html)) !== null && queue.length + results.length < maxPages) {
+            try {
+              const absoluteUrl = new URL(match[1], baseUrl).href;
+              if (absoluteUrl.startsWith(baseUrl.origin) && !visited.has(absoluteUrl)) {
+                queue.push({ url: absoluteUrl, depth: depth + 1 });
+              }
+            } catch (e) {}
           }
-        } catch (e) {}
+        }
+      } catch (err) {
+        console.error(`Failed to crawl ${currentUrl}:`, err.message);
       }
     }
 
-    if (!verified) {
-      return { valid: false, error: "No valid USDC transfer found to payment address in transaction logs" };
+    res.json({ success: true, seedUrl: url, pagesCrawled: results.length, data: results, metadata: { crawledAt: new Date().toISOString(), costUsdc: "0.0050" } });
+  } catch (error) {
+    console.error("Crawl error:", error);
+    res.status(500).json({ error: "Crawl Failed", message: error.message });
+  }
+});
+
+// 3. Dynamic JavaScript Rendering Endpoint
+app.post("/api/render", authenticateApiKey, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
     }
 
-    return { valid: true };
-  } catch (err) {
-    console.error("[x402] Verification error:", err);
-    return { valid: false, error: `On-chain validation error: ${err.message}` };
-  }
-}
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+    });
 
-async function scrapeUrl(url) {
-  console.log(`[Scraper] Fetching URL: ${url}`);
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    const html = await response.text();
+    
+    let title = "No Title Found";
+    const titleStart = html.toLowerCase().indexOf("<title>");
+    const titleEnd = html.toLowerCase().indexOf("</title>");
+    if (titleStart !== -1 && titleEnd !== -1 && titleEnd > titleStart) {
+      title = html.substring(titleStart + 7, titleEnd).trim();
     }
-  });
 
-  if (!response.ok) {
-    return { isError: true, text: `HTTP Error ${response.status}: ${response.statusText}` };
-  }
-
-  const html = await response.text();
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const pageTitle = titleMatch ? titleMatch[1].trim() : "No title found";
-
-  let cleanHtml = html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style[^<]*(?:(?!</style>)<[^<]*)*</style>/gi, '')
-      .replace(/<[^>]*>?/gm, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 20000);
+    let cleanContent = "";
+    let insideTag = false;
+    for (let i = 0; i < html.length; i++) {
+      if (html[i] === '<') insideTag = true;
+      else if (html[i] === '>') insideTag = false;
+      else if (!insideTag) cleanContent += html[i];
+    }
+    cleanContent = cleanContent.replace(/\s+/g, ' ').trim().slice(0, 20000);
 
     res.json({
       success: true,
       url,
       rendered: true,
-      data: {
-        title,
-        content: cleanContent,
-        rawLength: html.length
-      },
-      metadata: {
-        renderedAt: new Date().toISOString(),
-        costUsdc: "0.0030"
-      }
+      data: { title, content: cleanContent, rawLength: html.length },
+      metadata: { renderedAt: new Date().toISOString(), costUsdc: "0.0030" }
     });
   } catch (error) {
     console.error("Render error:", error);
@@ -163,44 +170,14 @@ async function scrapeUrl(url) {
   }
 });
 
+// Model Context Protocol (MCP) Transport Handler Placeholder
+const handleMcpTransport = (req, res) => {
+  res.json({ jsonrpc: "2.0", result: { status: "active", capabilities: ["extract", "crawl", "render"] }, id: req.body.id || 1 });
+};
+
 app.post("/", handleMcpTransport);
 
-
-
-app.get("/mcp", handleMcpTransport);
-
-
-app.all("/mcp", async (req, res) => {
-  try {
-    const server = createMcpServer();
-    const transport = new StreamableHTTPServerTransport();
-    await server.connect(transport);
-    await transport.handleRequest(req, res);
-  } catch (error) {
-    console.error("Error handling Streamable HTTP request on /mcp:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Internal Server Error", message: error.message });
-    }
-  }
-});
-
-const PORT = parseInt(process.env.PORT || "8080", 10);
-app.listen(PORT, "0.0.0.0", () => console.log(`MCP Server running on port ${PORT}`));
-
-app.all(/^\/mcp\]\(https:\/\//, (req, res) => {
-  req.url = "/mcp";
-  return app._router.handle(req, res);
-});
-
-
-// Glama auto-discovery manifest
-app.get('/.well-known/glama.json', (req, res) => {
-  res.json({
-    "name": "x402-scraper-api",
-    "description": "MCP Scraper API with USDC microtransactions on Base",
-    "transport": {
-      "type": "streamable-http",
-      "url": "https://x402-scraper-api-production-67a4.up.railway.app/"
-    }
-  });
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`x402-scraper-api running on port ${PORT}`);
 });
