@@ -42,7 +42,7 @@ const baseClient = createPublicClient({
 });
 
 const scrapeCache = new LRUCache({
-  max: 500,
+  max: 300,
   ttl: 10 * 60 * 1000, 
 });
 
@@ -58,7 +58,7 @@ const X402_CONFIG = {
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.headers["x-api-key"] || req.ip,
