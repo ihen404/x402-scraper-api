@@ -248,7 +248,16 @@ app.post("/api/scrape", apiLimiter, authenticateApiKey, express.json(), async (r
   return res.status(200).json({ url, result: result.text, cached: false });
 });
 
-app.post("/", apiLimiter, async (req, res) => { req.url = "/mcp"; return app._router.handle(req, res); });
+
+// Handle root POST and /mcp requests uniformly for Streamable HTTP transport
+const handleMcpTransport = async (req, res) => {
+  req.url = "/mcp";
+  return app._router.handle(req, res);
+};
+
+app.post("/", apiLimiter, handleMcpTransport);
+app.get("/mcp", apiLimiter, handleMcpTransport);
+
 
 app.all("/mcp", apiLimiter, async (req, res) => {
   try {
