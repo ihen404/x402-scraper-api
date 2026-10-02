@@ -22,61 +22,60 @@ app.get("/health", (req, res) => {
   res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-// --- Official MCP Server Configuration ---
-const mcpServer = new McpServer({
-  name: "x402-scraper-api",
-  version: "1.0.0"
-});
 
-// Register tools into the official MCP server instance
-mcpServer.tool(
-  "extract",
-  "Extract structured data from a URL using an AI schema instruction",
-  {
-    url: z.string().describe("Target URL to scrape"),
-    instruction: z.string().describe("Extraction instruction or description"),
-  },
-  async ({ url, instruction }) => {
-    return {
-      content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
-    };
-  }
-);
-
-mcpServer.tool(
-  "crawl",
-  "Recursively crawl pages up to a given depth",
-  {
-    url: z.string().describe("Seed URL for crawling"),
-    maxDepth: z.number().optional().describe("Maximum crawl depth")
-  },
-  async ({ url, maxDepth }) => {
-    return {
-      content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
-    };
-  }
-);
-
-mcpServer.tool(
-  "render",
-  "Render a JavaScript/SPA-heavy website and strip markup cleanly",
-  {
-    url: z.string().describe("Target URL to render")
-  },
-  async ({ url }) => {
-    return {
-      content: [{ type: "text", text: `Render tool ready for ${url}` }]
-    };
-  }
-);
-
-// MCP Transport Handlers using official Streamable HTTP transport
+// --- Official MCP Server & Transport Handler ---
 const handleMcpTransport = async (req, res) => {
   try {
+    const server = new McpServer({
+      name: "x402-scraper-api",
+      version: "1.0.0"
+    });
+
+    server.tool(
+      "extract",
+      "Extract structured data from a URL using an AI schema instruction",
+      {
+        url: z.string().describe("Target URL to scrape"),
+        instruction: z.string().describe("Extraction instruction or description"),
+      },
+      async ({ url, instruction }) => {
+        return {
+          content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
+        };
+      }
+    );
+
+    server.tool(
+      "crawl",
+      "Recursively crawl pages up to a given depth",
+      {
+        url: z.string().describe("Seed URL for crawling"),
+        maxDepth: z.number().optional().describe("Maximum crawl depth")
+      },
+      async ({ url, maxDepth }) => {
+        return {
+          content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
+        };
+      }
+    );
+
+    server.tool(
+      "render",
+      "Render a JavaScript/SPA-heavy website and strip markup cleanly",
+      {
+        url: z.string().describe("Target URL to render")
+      },
+      async ({ url }) => {
+        return {
+          content: [{ type: "text", text: `Render tool ready for ${url}` }]
+        };
+      }
+    );
+
     const transport = new StreamableHTTPServerTransport({
       endpoint: "/mcp"
     });
-    await mcpServer.connect(transport);
+    await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("MCP Transport Error:", error);
@@ -85,10 +84,6 @@ const handleMcpTransport = async (req, res) => {
     }
   }
 };
-
-app.post("/", handleMcpTransport);
-app.post("/mcp", handleMcpTransport);
-// -----------------------------------------
 
 // 1. Structured Data Extraction Endpoint (Protected)
 app.post("/api/extract", authenticateApiKey, async (req, res) => {
