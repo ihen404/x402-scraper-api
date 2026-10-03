@@ -23,59 +23,63 @@ app.get("/health", (req, res) => {
 });
 
 
-// --- Official MCP Server & Transport Handler ---
+
+// --- Persistent Official MCP Server & Transport Handler ---
+const mcpServer = new McpServer({
+  name: "x402-scraper-api",
+  version: "1.0.0"
+});
+
+mcpServer.tool(
+  "extract",
+  "Extract structured data from a URL using an AI schema instruction",
+  {
+    url: z.string().describe("Target URL to scrape"),
+    instruction: z.string().describe("Extraction instruction or description"),
+  },
+  async ({ url, instruction }) => {
+    return {
+      content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
+    };
+  }
+);
+
+mcpServer.tool(
+  "crawl",
+  "Recursively crawl pages up to a given depth",
+  {
+    url: z.string().describe("Seed URL for crawling"),
+    maxDepth: z.number().optional().describe("Maximum crawl depth")
+  },
+  async ({ url, maxDepth }) => {
+    return {
+      content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
+    };
+  }
+);
+
+mcpServer.tool(
+  "render",
+  "Render a JavaScript/SPA-heavy website and strip markup cleanly",
+  {
+    url: z.string().describe("Target URL to render")
+  },
+  async ({ url }) => {
+    return {
+      content: [{ type: "text", text: `Render tool ready for ${url}` }]
+    };
+  }
+);
+
+const transport = new StreamableHTTPServerTransport({
+  endpoint: "/mcp"
+});
+
+// Connect the persistent server to the transport once at startup
+await mcpServer.connect(transport);
+
 const handleMcpTransport = async (req, res) => {
   try {
-    const server = new McpServer({
-      name: "x402-scraper-api",
-      version: "1.0.0"
-    });
-
-    server.tool(
-      "extract",
-      "Extract structured data from a URL using an AI schema instruction",
-      {
-        url: z.string().describe("Target URL to scrape"),
-        instruction: z.string().describe("Extraction instruction or description"),
-      },
-      async ({ url, instruction }) => {
-        return {
-          content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
-        };
-      }
-    );
-
-    server.tool(
-      "crawl",
-      "Recursively crawl pages up to a given depth",
-      {
-        url: z.string().describe("Seed URL for crawling"),
-        maxDepth: z.number().optional().describe("Maximum crawl depth")
-      },
-      async ({ url, maxDepth }) => {
-        return {
-          content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
-        };
-      }
-    );
-
-    server.tool(
-      "render",
-      "Render a JavaScript/SPA-heavy website and strip markup cleanly",
-      {
-        url: z.string().describe("Target URL to render")
-      },
-      async ({ url }) => {
-        return {
-          content: [{ type: "text", text: `Render tool ready for ${url}` }]
-        };
-      }
-    );
-
-    const transport = new StreamableHTTPServerTransport({
-      endpoint: "/mcp"
-    });
-    await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("MCP Transport Error:", error);
