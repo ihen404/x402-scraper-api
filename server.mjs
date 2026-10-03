@@ -2,6 +2,7 @@ import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json());
@@ -58,6 +59,36 @@ const handleMcpTransport = async (req, res) => {
         return {
           content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
         };
+      }
+    );
+
+    
+    server.tool(
+      "screenshot",
+      "Capture a visual screenshot of a target URL using a headless browser",
+      {
+        url: z.string().describe("Target URL to capture"),
+        fullPage: z.boolean().optional().describe("Whether to capture the full scrollable page")
+      },
+      async ({ url, fullPage }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/screenshot", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, fullPage })
+          });
+          const data = await response.json();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: err.message }) }]
+          };
+        }
       }
     );
 
@@ -238,6 +269,44 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
   } catch (error) {
     console.error("Render error:", error);
     res.status(500).json({ error: "Render Failed", message: error.message });
+  }
+});
+
+
+// 4. Visual Screenshot Capture Endpoint (Protected)
+app.post("/api/screenshot", authenticateApiKey, async (req, res) => {
+  let browser = null;
+  try {
+    const { url, fullPage = false } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
+    }
+
+    browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+
+    const screenshotBuffer = await page.screenshot({ fullPage, encoding: "base64" });
+    await browser.close();
+    browser = null;
+
+    res.json({
+      success: true,
+      url,
+      data: {
+        format: "png",
+        encoding: "base64",
+        image: screenshotBuffer
+      },
+      metadata: { capturedAt: new Date().toISOString(), costUsdc: "0.0050" }
+    });
+  } catch (error) {
+    if (browser) await browser.close();
+    console.error("Screenshot error:", error);
+    res.status(500).json({ error: "Screenshot Failed", message: error.message });
   }
 });
 
