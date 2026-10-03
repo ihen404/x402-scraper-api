@@ -6,6 +6,28 @@ import { z } from "zod";
 const app = express();
 app.use(express.json());
 
+// --- Usage Logging & Analytics Store ---
+const requestLogs = [];
+const requestLogger = (req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    requestLogs.push({
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: duration,
+      userAgent: req.headers["user-agent"] || "unknown"
+    });
+    // Keep only the last 500 requests in memory
+    if (requestLogs.length > 500) requestLogs.shift();
+  });
+  next();
+};
+app.use(requestLogger);
+
+
 // API Key Authentication Middleware
 const authenticateApiKey = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -196,6 +218,27 @@ const handleMcpTransport = async (req, res) => {
               "Authorization": "Bearer " + (process.env.API_KEY || "")
             },
             body: JSON.stringify({ url, actions })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
+      }
+    );
+
+    
+    server.tool(
+      "get_analytics",
+      "Retrieve real-time usage metrics, request counts, and estimated revenue analytics for the x402 scraper API",
+      {},
+      async () => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/analytics", {
+            method: "GET",
+            headers: { 
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            }
           });
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
@@ -435,6 +478,36 @@ app.post("/api/automate", requireX402Payment("3500"), async (req, res) => {
   } catch (error) {
     console.error("Automation error:", error);
     res.status(500).json({ error: "Automation Failed", message: error.message });
+  }
+});
+
+
+// 8. Usage Analytics Endpoint (Protected by API Key or x402)
+app.get("/api/analytics", authenticateApiKey, async (req, res) => {
+  try {
+    const totalRequests = requestLogs.length;
+    const statusCounts = requestLogs.reduce((acc, log) => {
+      acc[log.status] = (acc[log.status] || 0) + 1;
+      return acc;
+    }, {});
+    const endpointCounts = requestLogs.reduce((acc, log) => {
+      acc[log.path] = (acc[log.path] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      summary: {
+        totalRequestsRecorded: totalRequests,
+        statusBreakdown: statusCounts,
+        endpointBreakdown: endpointCounts,
+        estimatedUsdcVolume: (totalRequests * 0.002).toFixed(4)
+      },
+      recentLogs: requestLogs.slice(-20).reverse(),
+      metadata: { generatedAt: new Date().toISOString() }
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Analytics Failed", message: error.message });
   }
 });
 
