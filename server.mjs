@@ -149,6 +149,32 @@ const handleMcpTransport = async (req, res) => {
       }
     );
 
+    
+    server.tool(
+      "search_rag",
+      "Perform semantic search / RAG retrieval against a target URL using a natural language query",
+      {
+        url: z.string().describe("Target URL to scrape and query against"),
+        query: z.string().describe("Natural language search query or question")
+      },
+      async ({ url, query }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/search-rag", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, query })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
+      }
+    );
+
     server.tool(
       "render",
       "Render a JavaScript/SPA-heavy website with optional element wait selectors",
@@ -270,6 +296,71 @@ app.post("/api/pdf", requireX402Payment("2000"), async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: "PDF Generation Failed", message: error.message });
+  }
+});
+
+
+// 6. AI Agent Semantic Search / RAG Endpoint (Protected by x402 micropayment)
+app.post("/api/search-rag", requireX402Payment("2500"), async (req, res) => {
+  try {
+    const { url, query } = req.body;
+    if (!url || !query) {
+      return res.status(400).json({ error: "Bad Request", message: "Both 'url' and 'query' are required." });
+    }
+
+    // Fetch and clean target content
+    const response = await fetch(url, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
+    const htmlText = await response.text();
+    const cleanText = htmlText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Chunk text into sentences/paragraphs (approx 500 chars each)
+    const rawChunks = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
+    const chunks = rawChunks.map(c => c.trim()).filter(c => c.length > 30);
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.json({
+        success: true,
+        url,
+        query,
+        matches: chunks.slice(0, 3).map((chunk, idx) => ({ rank: idx + 1, snippet: chunk, score: 0.85 })),
+        metadata: { note: "OPENAI_API_KEY not set, returned heuristic text chunks", costUsdc: "0.0025" }
+      });
+    }
+
+    // Use OpenAI embeddings or chat completion for semantic relevance scoring
+    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a precise semantic search engine. Given the text chunks and a user query, return a JSON object with an array called 'matches' containing the top 3 most relevant text chunks, their rank, and a relevance score between 0 and 1." 
+          },
+          { 
+            role: "user", 
+            content: `Query: "${query}"\n\nText Chunks:\n${JSON.stringify(chunks.slice(0, 30))}` 
+          }
+        ],
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const aiData = await aiRes.json();
+    const parsedData = aiData.choices?.[0] ? JSON.parse(aiData.choices[0].message.content) : { matches: [] };
+
+    res.json({
+      success: true,
+      url,
+      query,
+      ...parsedData,
+      metadata: { searchedAt: new Date().toISOString(), costUsdc: "0.0025" }
+    });
+  } catch (error) {
+    console.error("RAG Search error:", error);
+    res.status(500).json({ error: "RAG Search Failed", message: error.message });
   }
 });
 
