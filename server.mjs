@@ -34,43 +34,70 @@ const handleMcpTransport = async (req, res) => {
       version: "1.0.0"
     });
 
+    
     server.tool(
       "extract",
-      "Extract structured data from a URL using an AI schema instruction",
+      "Extract structured data from a specific URL or CSS selector using an AI schema instruction",
       {
         url: z.string().describe("Target URL to scrape"),
         instruction: z.string().describe("Extraction instruction or description"),
+        selector: z.string().optional().describe("Optional CSS selector to target a specific container element"),
+        timeout: z.number().optional().describe("Page load timeout in milliseconds")
       },
-      async ({ url, instruction }) => {
-        return {
-          content: [{ type: "text", text: `Extraction tool ready for target: ${url} with instruction: ${instruction}` }]
-        };
+      async ({ url, instruction, selector, timeout }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/extract", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, schema: { type: "object", properties: { result: { type: "string" } } }, instruction, selector, timeout })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
       }
     );
 
     server.tool(
       "crawl",
-      "Recursively crawl pages up to a given depth",
+      "Recursively crawl pages up to a given depth with page limits and domain scoping",
       {
         url: z.string().describe("Seed URL for crawling"),
-        maxDepth: z.number().optional().describe("Maximum crawl depth")
+        maxDepth: z.number().optional().describe("Maximum crawl depth (default 2)"),
+        maxPages: z.number().optional().describe("Maximum total pages to crawl (default 5)")
       },
-      async ({ url, maxDepth }) => {
-        return {
-          content: [{ type: "text", text: `Crawl tool ready for ${url} with max depth ${maxDepth || 2}` }]
-        };
+      async ({ url, maxDepth, maxPages }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/crawl", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, maxDepth, maxPages })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
       }
     );
 
-    
     server.tool(
       "screenshot",
-      "Capture a visual screenshot of a target URL using a headless browser",
+      "Capture a visual screenshot of a target URL using a headless browser with custom viewport and full-page options",
       {
         url: z.string().describe("Target URL to capture"),
-        fullPage: z.boolean().optional().describe("Whether to capture the full scrollable page")
+        fullPage: z.boolean().optional().describe("Whether to capture the full scrollable page"),
+        width: z.number().optional().describe("Viewport width in pixels (default 1280)"),
+        height: z.number().optional().describe("Viewport height in pixels (default 800)")
       },
-      async ({ url, fullPage }) => {
+      async ({ url, fullPage, width, height }) => {
         try {
           const response = await fetch("https://" + req.get('host') + "/api/screenshot", {
             method: "POST",
@@ -78,34 +105,42 @@ const handleMcpTransport = async (req, res) => {
               "Content-Type": "application/json",
               "Authorization": "Bearer " + (process.env.API_KEY || "")
             },
-            body: JSON.stringify({ url, fullPage })
+            body: JSON.stringify({ url, fullPage, width, height })
           });
           const data = await response.json();
-          return {
-            content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
-          };
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
         } catch (err) {
-          return {
-            content: [{ type: "text", text: JSON.stringify({ error: err.message }) }]
-          };
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
     );
 
     server.tool(
       "render",
-      "Render a JavaScript/SPA-heavy website and strip markup cleanly",
+      "Render a JavaScript/SPA-heavy website with optional element wait selectors",
       {
-        url: z.string().describe("Target URL to render")
+        url: z.string().describe("Target URL to render"),
+        waitForSelector: z.string().optional().describe("Optional CSS selector to wait for before capturing content")
       },
-      async ({ url }) => {
-        return {
-          content: [{ type: "text", text: `Render tool ready for ${url}` }]
-        };
+      async ({ url, waitForSelector }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/render", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, waitForSelector })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
       }
     );
 
-    const transport = new StreamableHTTPServerTransport({
+const transport = new StreamableHTTPServerTransport({
       endpoint: "/mcp"
     });
     
