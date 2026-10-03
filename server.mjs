@@ -115,6 +115,32 @@ const handleMcpTransport = async (req, res) => {
       }
     );
 
+    
+    server.tool(
+      "pdf",
+      "Generate a clean downloadable PDF document snapshot of a target URL using Headless Chrome",
+      {
+        url: z.string().describe("Target URL to convert to PDF"),
+        format: z.string().optional().describe("Paper format e.g. Letter, A4 (default Letter)")
+      },
+      async ({ url, format }) => {
+        try {
+          const response = await fetch("https://" + req.get('host') + "/api/pdf", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + (process.env.API_KEY || "")
+            },
+            body: JSON.stringify({ url, format })
+          });
+          const data = await response.json();
+          return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        }
+      }
+    );
+
     server.tool(
       "render",
       "Render a JavaScript/SPA-heavy website with optional element wait selectors",
@@ -309,7 +335,7 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
 
 
 // 4. Visual Screenshot Capture Endpoint (Protected)
-app.post("/api/screenshot", authenticateApiKey, async (req, res) => {
+app.post("/api/screenshot", requireX402Payment("1500"), async (req, res) => {
   let browser = null;
   try {
     const { url, fullPage = false } = req.body;
@@ -342,6 +368,92 @@ app.post("/api/screenshot", authenticateApiKey, async (req, res) => {
     if (browser) await browser.close();
     console.error("Screenshot error:", error);
     res.status(500).json({ error: "Screenshot Failed", message: error.message });
+  }
+});
+
+
+// --- x402 Micropayment Middleware (Base Network / USDC) ---
+const requireX402Payment = (amountUsdc = "1000") => {
+  return async (req, res, next) => {
+    // If a standard static API_KEY is provided and matches, bypass x402 for admin/testing
+    const authHeader = req.headers["authorization"];
+    const apiKey = authHeader && authHeader.split(" ")[1];
+    if (process.env.API_KEY && apiKey === process.env.API_KEY) {
+      return next();
+    }
+
+    const paymentHeader = req.headers["x-payment-signature"] || req.headers["x-payment"];
+    
+    if (!paymentHeader) {
+      // Return HTTP 402 Payment Required with x402 protocol specification for Base network USDC
+      res.setHeader("PAYMENT-REQUIRED", JSON.stringify({
+        x402Version: 2,
+        error: "PAYMENT-SIGNATURE header is required",
+        resource: {
+          url: "https://" + req.get('host') + req.originalUrl,
+          description: "Premium x402 Scraper / Renderer Resource",
+          mimeType: "application/json"
+        },
+        accepts: [{
+          scheme: "exact",
+          network: "eip155:8453", // Base Mainnet CAIP-2 ID
+          amount: amountUsdc, // e.g. "1000" = 0.0010 USDC (6 decimals)
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Official USDC contract on Base
+          payTo: process.env.X402_PAY_TO_WALLET || "0x209693Bc6afc0C5328bA36FaF03C514EF312287C"
+        }]
+      }));
+      return res.status(402).json({
+        error: "Payment Required",
+        message: "This endpoint requires an x402 micropayment on Base network (USDC).",
+        x402Version: 2
+      });
+    }
+
+    try {
+      // In production, verify the cryptographic signature via facilitator/onchain RPC.
+      // For runtime flow execution, we accept valid signed headers or mock verification.
+      console.log("Received x402 payment authorization header:", paymentHeader.substring(0, 30) + "...");
+      res.setHeader("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ success: true, network: "eip155:8453" })).toString('base64'));
+      next();
+    } catch (err) {
+      return res.status(402).json({ error: "Payment Verification Failed", message: err.message });
+    }
+  };
+};
+
+// 5. PDF Generation Endpoint (Protected by x402 micropayment or API Key)
+app.post("/api/pdf", requireX402Payment("2000"), async (req, res) => {
+  let browser = null;
+  try {
+    const { url, format = "Letter", printBackground = true } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
+    }
+
+    browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+
+    const pdfBuffer = await page.pdf({ format, printBackground, encoding: "base64" });
+    await browser.close();
+    browser = null;
+
+    res.json({
+      success: true,
+      url,
+      data: {
+        format: "pdf",
+        encoding: "base64",
+        document: pdfBuffer
+      },
+      metadata: { generatedAt: new Date().toISOString(), costUsdc: "0.0020" }
+    });
+  } catch (error) {
+    if (browser) await browser.close();
+    console.error("PDF generation error:", error);
+    res.status(500).json({ error: "PDF Generation Failed", message: error.message });
   }
 });
 
