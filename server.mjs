@@ -285,8 +285,9 @@ const handleMcpTransport = async (req, res) => {
   }
 };
 
-app.post("/", handleMcpTransport);
-app.post("/mcp", handleMcpTransport);
+app.all("/", handleMcpTransport);
+app.all("/mcp", handleMcpTransport);
+app.all("/mcp/*", handleMcpTransport);
 
 // 1. Structured Data Extraction Endpoint
 app.post("/api/extract", authenticateApiKey, async (req, res) => {
