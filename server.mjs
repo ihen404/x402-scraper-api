@@ -92,7 +92,7 @@ const requireX402Payment = (amountUsdc = "1000") => {
 // Health Check & Root Endpoints
 app.get("/health", (req, res) => res.json({ status: "healthy", timestamp: new Date().toISOString() }));
 app.get("/", (req, res) => res.json({ name: "x402-scraper-api", status: "online", mcpEndpoint: "/mcp" }));
-app.get("/mcp", (req, res) => res.json({ name: "x402-scraper-api", status: "online", protocol: "mcp-streamable-http" }));
+app.get("/mcp", handleMcpTransport);
 
 // Stateless MCP Transport Handler factory
 const handleMcpTransport = async (req, res) => {
