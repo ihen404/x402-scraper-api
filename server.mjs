@@ -95,7 +95,7 @@ app.get("/", (req, res) => res.json({ name: "x402-scraper-api", status: "online"
 app.get("/mcp", handleMcpTransport);
 
 // Stateless MCP Transport Handler factory
-const handleMcpTransport = async (req, res) => {
+async function handleMcpTransport(req, res) {
   try {
     const server = new McpServer({
       name: "x402-scraper-api",
