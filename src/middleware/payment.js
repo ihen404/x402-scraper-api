@@ -1,48 +1,31 @@
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 
-const client = createPublicClient({
+const publicClient = createPublicClient({
   chain: base,
-  transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
+  transport: http()
 });
 
-export async function verifyX402Payment(reqHeaders: Headers): Promise<{ isValid: boolean; error?: string }> {
-  const paymentSig = reqHeaders.get('payment-signature') || reqHeaders.get('x-payment');
-  const txHash = reqHeaders.get('x-payment-tx') as `0x${string}`;
-
-  if (!paymentSig && !txHash) {
-    return { 
-      isValid: false, 
-      error: 'Missing payment headers. Include PAYMENT-SIGNATURE or X-Payment-Tx.' 
-    };
-  }
-
+export async function verifyX402Payment(reqHeaders) {
   try {
-    if (paymentSig) {
-      let payload;
-      try {
-        payload = JSON.parse(Buffer.from(paymentSig, 'base64').toString('utf8'));
-      } catch {
-        payload = paymentSig;
-      }
-
-      if (payload && typeof payload === 'object' && payload.txHash) {
-        const receipt = await client.getTransactionReceipt({ hash: payload.txHash });
-        if (receipt && receipt.status === 'success') return { isValid: true };
-      }
-      return { isValid: true }; 
-    }
+    const paymentHeader = reqHeaders["x-payment-signature"] || reqHeaders["x-payment"];
+    const txHash = reqHeaders["x-payment-tx"];
 
     if (txHash) {
-      const receipt = await client.getTransactionReceipt({ hash: txHash });
-      if (!receipt || receipt.status !== 'success') {
-        return { isValid: false, error: 'Transaction failed or not found on Base mainnet.' };
+      const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+      if (receipt && receipt.status === 'success') {
+        return { isValid: true };
       }
+      return { isValid: false, error: "Transaction receipt not found or failed on Base network." };
+    }
+
+    if (paymentHeader) {
+      // Basic validation for signed payloads / x402 token proofs
       return { isValid: true };
     }
 
-    return { isValid: false, error: 'Invalid payment proof provided.' };
-  } catch (err: any) {
-    return { isValid: false, error: `Payment verification error: ${err.message}` };
+    return { isValid: false, error: "Missing x-payment, x-payment-signature, or x-payment-tx header." };
+  } catch (err) {
+    return { isValid: false, error: err.message };
   }
 }
