@@ -30,7 +30,6 @@ async function sendDailyAnalyticsWebhook(summaryData) {
         } else {
             console.error("Failed to dispatch daily analytics webhook:", response.statusText);
         }
-    } catch (err) {
         console.error("Error sending daily analytics webhook:", err.message);
     }
 }
@@ -128,7 +127,6 @@ const requireX402Payment = (amountUsdc = "1000") => {
       }
       res.setHeader("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ success: true, network: "eip155:8453" })).toString('base64'));
       next();
-    } catch (err) {
       return res.status(402).json({ error: "Payment Verification Failed", message: err.message });
     }
   };
@@ -248,7 +246,6 @@ async function handleMcpTransport(req, res) {
           });
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-        } catch (err) {
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
@@ -278,7 +275,6 @@ async function handleMcpTransport(req, res) {
           });
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-        } catch (err) {
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
@@ -299,7 +295,6 @@ async function handleMcpTransport(req, res) {
           });
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-        } catch (err) {
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
@@ -613,7 +608,6 @@ setInterval(() => {
 
 
 // Manifest alias for crawlers looking for .json
-} catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
@@ -655,7 +649,6 @@ app.post('/api/test-analytics-report', async (req, res) => {
         } else {
             return res.status(500).json({ success: false, error: response.statusText });
         }
-    } catch (err) {
         return res.status(500).json({ success: false, error: err.message });
     }
 });
