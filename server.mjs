@@ -24,6 +24,10 @@ next();
 const requireX402Payment = (cost) => (req, res, next) => next();
 
 // Health Check
+app.get("/", (req, res) => {
+    res.json({ name: "x402 Scraper API", status: "active", docs: "/.well-known/x402.json" });
+});
+
 app.get("/health", (req, res) => {
 res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
