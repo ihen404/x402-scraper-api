@@ -236,6 +236,8 @@ async function handleMcpTransport(req, res) {
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
     );
