@@ -290,6 +290,33 @@ async function handleMcpTransport(req, res) {
 };
 
 app.all("/", handleMcpTransport);
+
+// Autonomous AI Agent Discovery Manifest
+app.get("/.well-known/x402", (req, res) => {
+  res.json({
+    service: "x402-scraper-api",
+    version: "1.0.0",
+    description: "Machine-to-machine web scraper powered by HTTP 402 USDC micropayments on Base.",
+    endpoints: {
+      scrape: {
+        url: "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
+        method: "POST",
+        schema: {
+          url: "string (target webpage to extract)"
+        }
+      }
+    },
+    payment: {
+      network: "Base Mainnet",
+      chainId: 8453,
+      asset: "USDC",
+      tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      payTo: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
+      pricePerCallUSDC: "0.005"
+    }
+  });
+});
+
 app.all("/mcp", handleMcpTransport);
 app.all("/mcp/*", handleMcpTransport);
 
