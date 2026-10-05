@@ -39,6 +39,9 @@ app.get("/.well-known/x402.json", (req, res) => {
 res.json({
     name: "x402 Scraper API",
     version: "1.0",
+    x402_version: "1.0",
+    network: "base",
+    payment_address: process.env.PAYMENT_ADDRESS || "0x0000000000000000000000000000000000000000",
     endpoints: {
         scrape: "/api/scrape",
         crawl: "/api/crawl",
