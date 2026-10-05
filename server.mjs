@@ -8,21 +8,7 @@ import { z } from "zod";
 async function sendDailyAnalyticsReport() {
 console.log("Analytics report skipped.");
 }
-() {
-console.log("Analytics report skipped.");
-}
 
-
- }
-});
-
-// 2. Deep Crawling Endpoint
-app.post("/api/crawl", authenticateApiKey, async (req, res) => {
-  try {
-    const { url, maxDepth = 2, maxPages = 5 } = req.body;
-    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target 'url' is required." });
-    
-    const response = await fetch(url, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
     const html = await response.text();
     res.json({ success: true, seedUrl: url, pagesCrawled: 1, data: [{ url, depth: 1, content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000) }], metadata: { crawledAt: new Date().toISOString(), costUsdc: "0.0050" } });
   } }
