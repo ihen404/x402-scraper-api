@@ -9,11 +9,6 @@ async function sendDailyAnalyticsReport() {
 console.log("Analytics report skipped.");
 }
 
-    const html = await response.text();
-    res.json({ success: true, seedUrl: url, pagesCrawled: 1, data: [{ url, depth: 1, content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000) }], metadata: { crawledAt: new Date().toISOString(), costUsdc: "0.0050" } });
-  } }
-});
-
 // 3. Dynamic JavaScript Rendering Endpoint
 app.post("/api/render", authenticateApiKey, async (req, res) => {
   try {
