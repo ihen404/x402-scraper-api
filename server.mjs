@@ -46,7 +46,7 @@ res.json({
 app.post("/api/scrape", authenticateApiKey, async (req, res) => {
 try {
     const { url } = req.body;
-    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target \url is required." });
+    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target URL is required." });
     const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const html = await response.text();
     res.json({ 
@@ -64,7 +64,7 @@ try {
 app.post("/api/crawl", authenticateApiKey, async (req, res) => {
 try {
     const { url, maxDepth = 2 } = req.body;
-    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target \url is required." });
+    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target URL is required." });
     const response = await fetch(url, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
     const html = await response.text();
     res.json({ 
@@ -83,7 +83,7 @@ try {
 app.post("/api/render", authenticateApiKey, async (req, res) => {
 try {
     const { url } = req.body;
-    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target \url is required." });
+    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target URL is required." });
     const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const html = await response.text();
     res.json({ 
@@ -102,7 +102,7 @@ try {
 app.post("/api/screenshot", requireX402Payment("1500"), async (req, res) => {
 try {
     const { url } = req.body;
-    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target \url is required." });
+    if (!url) return res.status(400).json({ error: "Bad Request", message: "A target URL is required." });
     res.json({
         success: true,
         url,
