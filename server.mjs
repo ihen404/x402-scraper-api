@@ -606,3 +606,9 @@ setInterval(() => {
     console.log(`[DAILY ANALYTICS REPORT - ${now.toISOString().split('T')[0]}] Summary generated successfully.`);
     // In production, this can be wired to a webhook, Discord/Slack alert, or email dispatcher.
 }, 24 * 60 * 60 * 1000);
+
+// Explicitly add x402.json alias route
+app.get('/.well-known/x402.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.sendFile(path.join(process.cwd(), '.well-known', 'x402'));
+});
