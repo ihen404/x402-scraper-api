@@ -1,4 +1,39 @@
 
+async function sendDailyAnalyticsWebhook(summaryData) {
+    const webhookUrl = process.env.DAILY_ANALYTICS_WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.log("Daily analytics summary compiled, but DAILY_ANALYTICS_WEBHOOK_URL is not set.");
+        return;
+    }
+
+    try {
+        const payload = {
+            content: `📊 **Daily x402 Scraper Analytics Summary** \`${new Date().toISOString().split('T')[0]}\` \
+` +
+                     `• Total Requests: **${summaryData.totalRequestsRecorded}**\
+` +
+                     `• Estimated USDC Volume: **$\${summaryData.estimatedUsdcVolume}**\
+` +
+                     `• Endpoint Breakdown: ${JSON.stringify(summaryData.endpointBreakdown)}`
+        };
+
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            console.log("Daily analytics webhook dispatched successfully.");
+        } else {
+            console.error("Failed to dispatch daily analytics webhook:", response.statusText);
+        }
+    } catch (err) {
+        console.error("Error sending daily analytics webhook:", err.message);
+    }
+}
+
+
 function calculateDynamicPricing(tokenCount) {
     if (tokenCount > 5000) return "0.0075"; // Tier 3: Heavy / Recursive
     if (tokenCount > 1000) return "0.0035"; // Tier 2: Deep Extraction / RAG
