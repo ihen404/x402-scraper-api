@@ -16,7 +16,7 @@ app.use(express.json());
 const authenticateApiKey = (req, res, next) => {
 const apiKey = req.headers["x-api-key"] || req.query.api_key;
 if (!apiKey && process.env.NODE_ENV === "production") {
-    return res.status(401).json({ error: "Unauthorized", message: "API key required." });
+    return res.status(402).json({ error: "Unauthorized", message: "API key required." });
 }
 next();
 };
