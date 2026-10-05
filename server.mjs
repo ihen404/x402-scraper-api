@@ -1,3 +1,4 @@
+import path from 'path';
 
 async function sendDailyAnalyticsWebhook(summaryData) {
     const webhookUrl = process.env.DAILY_ANALYTICS_WEBHOOK_URL;
