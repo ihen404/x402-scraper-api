@@ -17,7 +17,9 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
     const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const html = await response.text();
     res.json({ success: true, url, rendered: true, data: { title: "Rendered Target Page", content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 15000) }, metadata: { costUsdc: "0.0030" } });
-  } }
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 // 4. Visual Screenshot Endpoint (Gated via x402)
@@ -31,7 +33,9 @@ app.post("/api/screenshot", requireX402Payment("1500"), async (req, res) => {
       data: { format: "png", encoding: "base64", image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" },
       metadata: { capturedAt: new Date().toISOString(), costUsdc: "0.0015" }
     });
-  } }
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 // 5. PDF Document Endpoint (Gated via x402)
@@ -45,7 +49,9 @@ app.post("/api/pdf", requireX402Payment("2000"), async (req, res) => {
       data: { format: "pdf", encoding: "base64", document: "JVBERi0xLjQKJcTl8uXrp/O..." },
       metadata: { generatedAt: new Date().toISOString(), costUsdc: "0.0020" }
     });
-  } }
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 
@@ -186,7 +192,9 @@ app.get("/api/analytics", authenticateApiKey, async (req, res) => {
       recentLogs: requestLogs.slice(-20).reverse(),
       metadata: { generatedAt: new Date().toISOString() }
     });
-  } }
+  } catch (err) {
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
