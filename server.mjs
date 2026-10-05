@@ -613,15 +613,7 @@ setInterval(() => {
 
 
 // Manifest alias for crawlers looking for .json
-app.get('/.well-known/x402.json', (req, res) => {
-    try {
-        const manifestPath = path.join(process.cwd(), '.well-known', 'x402');
-        if (fs.existsSync(manifestPath)) {
-            res.setHeader('Content-Type', 'application/json');
-            return res.sendFile(manifestPath);
-        }
-        res.status(404).json({ error: "Manifest not found" });
-    } catch (err) {
+} catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
@@ -666,4 +658,34 @@ app.post('/api/test-analytics-report', async (req, res) => {
     } catch (err) {
         return res.status(500).json({ success: false, error: err.message });
     }
+});
+
+
+// Manifest routes for x402 discovery
+const x402Manifest = {
+    "protocol": "x402",
+    "version": "1.0.0",
+    "endpoints": {
+        "extract": "/mcp",
+        "analytics": "/mcp"
+    },
+    "pricing": {
+        "currency": "USDC",
+        "network": "base",
+        "tiers": {
+            "standard": "0.0015",
+            "deep": "0.0035",
+            "heavy": "0.0075"
+        }
+    }
+};
+
+app.get('/.well-known/x402', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.json(x402Manifest);
+});
+
+app.get('/.well-known/x402.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.json(x402Manifest);
 });
