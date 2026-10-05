@@ -106,19 +106,18 @@ const requireX402Payment = (amountUsdc = "1000") => {
     }
 
     try {
-      const verification = await verifyX402Payment(req.headers);
-      if (!verification.isValid) {
-        return res.status(402).json({ 
-          error: "Payment Verification Failed", 
-          message: verification.error || "Invalid or unverified x402 payment proof." 
-        });
-    } catch (err) {
-      return res.status(402).json({ error: "Payment Verification Failed", message: err.message });
-    }
-      res.setHeader("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ success: true, network: "eip155:8453" })).toString('base64'));
-      next();
-      return res.status(402).json({ error: "Payment Verification Failed", message: err.message });
-    }
+  const verification = await verifyX402Payment(req.headers);
+  if (!verification.isValid) {
+    return res.status(402).json({ 
+      error: "Payment Verification Failed", 
+      message: verification.error || "Invalid or unverified x402 payment proof." 
+    });
+  }
+  res.setHeader("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ success: true, network: "eip155:8453" })).toString('base64'));
+  next();
+} catch (err) {
+  return res.status(402).json({ error: "Payment Verification Failed", message: err.message });
+}
   };
 };
 
