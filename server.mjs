@@ -1,13 +1,20 @@
+import TurndownService from "turndown";
+import { verifyX402Payment } from "./src/middleware/payment.js";
+import express from "express";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
+
+async function sendDailyAnalyticsReport() {
+console.log("Analytics report skipped.");
+}
+
 async function sendDailyAnalyticsReport() {
 console.log("Analytics report skipped.");
 }
 
 
- catch (error) {
-    res.status(500).json({ error: "Extraction Failed", message: error.message });
-
-
-  }
+ }
 });
 
 // 2. Deep Crawling Endpoint
@@ -19,9 +26,7 @@ app.post("/api/crawl", authenticateApiKey, async (req, res) => {
     const response = await fetch(url, { headers: { "User-Agent": "x402-Agent-Scraper/1.0" } });
     const html = await response.text();
     res.json({ success: true, seedUrl: url, pagesCrawled: 1, data: [{ url, depth: 1, content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000) }], metadata: { crawledAt: new Date().toISOString(), costUsdc: "0.0050" } });
-  } catch (error) {
-    res.status(500).json({ error: "Crawl Failed", message: error.message });
-  }
+  } }
 });
 
 // 3. Dynamic JavaScript Rendering Endpoint
@@ -32,9 +37,7 @@ app.post("/api/render", authenticateApiKey, async (req, res) => {
     const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const html = await response.text();
     res.json({ success: true, url, rendered: true, data: { title: "Rendered Target Page", content: html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 15000) }, metadata: { costUsdc: "0.0030" } });
-  } catch (error) {
-    res.status(500).json({ error: "Render Failed", message: error.message });
-  }
+  } }
 });
 
 // 4. Visual Screenshot Endpoint (Gated via x402)
@@ -48,9 +51,7 @@ app.post("/api/screenshot", requireX402Payment("1500"), async (req, res) => {
       data: { format: "png", encoding: "base64", image: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" },
       metadata: { capturedAt: new Date().toISOString(), costUsdc: "0.0015" }
     });
-  } catch (error) {
-    res.status(500).json({ error: "Screenshot Failed", message: error.message });
-  }
+  } }
 });
 
 // 5. PDF Document Endpoint (Gated via x402)
@@ -64,9 +65,7 @@ app.post("/api/pdf", requireX402Payment("2000"), async (req, res) => {
       data: { format: "pdf", encoding: "base64", document: "JVBERi0xLjQKJcTl8uXrp/O..." },
       metadata: { generatedAt: new Date().toISOString(), costUsdc: "0.0020" }
     });
-  } catch (error) {
-    res.status(500).json({ error: "PDF Generation Failed", message: error.message });
-  }
+  } }
 });
 
 
@@ -207,9 +206,7 @@ app.get("/api/analytics", authenticateApiKey, async (req, res) => {
       recentLogs: requestLogs.slice(-20).reverse(),
       metadata: { generatedAt: new Date().toISOString() }
     });
-  } catch (error) {
-    res.status(500).json({ error: "Analytics Failed", message: error.message });
-  }
+  } }
 });
 
 const PORT = process.env.PORT || 3000;
