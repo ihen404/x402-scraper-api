@@ -321,7 +321,6 @@ async function handleMcpTransport(req, res) {
     if (!res.headersSent) {
       res.status(500).json({ error: "Internal MCP Error", message: error.message });
     }
-        } catch (err) {
 };
 
 app.all("/", handleMcpTransport);
