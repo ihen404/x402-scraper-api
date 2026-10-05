@@ -96,6 +96,10 @@ app.get("/mcp", handleMcpTransport);
 
 // Stateless MCP Transport Handler factory
 async function handleMcpTransport(req, res) {
+  // Normalize Accept header for Glama and strict MCP clients
+  if (!req.headers['accept'] || !req.headers['accept'].includes('text/event-stream')) {
+    req.headers['accept'] = 'application/json, text/event-stream';
+  }
   try {
     const server = new McpServer({
       name: "x402-scraper-api",
