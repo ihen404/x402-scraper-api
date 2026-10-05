@@ -608,7 +608,60 @@ setInterval(() => {
 }, 24 * 60 * 60 * 1000);
 
 // Explicitly add x402.json alias route
+
+
+// Manifest alias for crawlers looking for .json
 app.get('/.well-known/x402.json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.sendFile(path.join(process.cwd(), '.well-known', 'x402'));
+    try {
+        const manifestPath = path.join(process.cwd(), '.well-known', 'x402');
+        if (fs.existsSync(manifestPath)) {
+            res.setHeader('Content-Type', 'application/json');
+            return res.sendFile(manifestPath);
+        }
+        res.status(404).json({ error: "Manifest not found" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Manual test trigger endpoint for daily analytics webhook
+app.post('/api/test-analytics-report', async (req, res) => {
+    try {
+        // Simulate summary generation
+        const summaryData = {
+            totalRequestsRecorded: 12,
+            statusBreakdown: { "200": 10, "400": 2 },
+            endpointBreakdown: { "/mcp": 8, "/.well-known/x402": 4 },
+            estimatedUsdcVolume: "0.0240"
+        };
+        
+        const webhookUrl = process.env.DAILY_ANALYTICS_WEBHOOK_URL;
+        if (!webhookUrl) {
+            return res.json({ success: false, message: "DAILY_ANALYTICS_WEBHOOK_URL environment variable is not configured." });
+        }
+
+        const payload = {
+            content: `📊 **Manual Test x402 Scraper Analytics Summary** \`${new Date().toISOString().split('T')[0]}\` \
+` +
+                     `• Total Requests: **${summaryData.totalRequestsRecorded}**\
+` +
+                     `• Estimated USDC Volume: **$\${summaryData.estimatedUsdcVolume}**\
+` +
+                     `• Endpoint Breakdown: ${JSON.stringify(summaryData.endpointBreakdown)}`
+        };
+
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            return res.json({ success: true, message: "Analytics report webhook dispatched successfully!" });
+        } else {
+            return res.status(500).json({ success: false, error: response.statusText });
+        }
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
 });
