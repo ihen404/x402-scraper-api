@@ -33,6 +33,8 @@ res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
 // x402 Manifest
+app.get("/.well-known/x402", (req, res) => res.redirect("/.well-known/x402.json"));
+
 app.get("/.well-known/x402.json", (req, res) => {
 res.json({
     name: "x402 Scraper API",
