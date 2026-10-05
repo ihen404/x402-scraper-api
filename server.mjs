@@ -19,6 +19,7 @@ async function sendDailyAnalyticsWebhook(summaryData) {
                      `• Endpoint Breakdown: ${JSON.stringify(summaryData.endpointBreakdown)}`
         };
 
+    try {
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -638,6 +639,7 @@ app.post('/api/test-analytics-report', async (req, res) => {
                      `• Endpoint Breakdown: ${JSON.stringify(summaryData.endpointBreakdown)}`
         };
 
+    try {
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
