@@ -8,8 +8,7 @@ import { z } from "zod";
 async function sendDailyAnalyticsReport() {
 console.log("Analytics report skipped.");
 }
-
-async function sendDailyAnalyticsReport() {
+() {
 console.log("Analytics report skipped.");
 }
 
