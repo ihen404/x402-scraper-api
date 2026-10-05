@@ -267,6 +267,8 @@ async function handleMcpTransport(req, res) {
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
     );
@@ -286,6 +288,8 @@ async function handleMcpTransport(req, res) {
           });
           const data = await response.json();
           return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+        } catch (err) {
           return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
         }
       }
@@ -317,6 +321,8 @@ async function handleMcpTransport(req, res) {
     if (!res.headersSent) {
       res.status(500).json({ error: "Internal MCP Error", message: error.message });
     }
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
   }
 };
 
@@ -381,6 +387,8 @@ app.post("/api/extract", authenticateApiKey, async (req, res) => {
     res.json({ success: true, url, data: parsedData, metadata: { extractedAt: new Date().toISOString(), costUsdc: "0.0015" } });
   } catch (error) {
     res.status(500).json({ error: "Extraction Failed", message: error.message });
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
   }
 });
 
@@ -505,6 +513,8 @@ app.post("/api/search-rag", requireX402Payment("2500"), async (req, res) => {
   } catch (error) {
     console.error("RAG Search error:", error);
     res.status(500).json({ error: "RAG Search Failed", message: error.message });
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
   }
 });
 
@@ -549,6 +559,8 @@ app.post("/api/automate", requireX402Payment("3500"), async (req, res) => {
   } catch (error) {
     console.error("Automation error:", error);
     res.status(500).json({ error: "Automation Failed", message: error.message });
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
   }
 });
 
@@ -643,6 +655,8 @@ app.post('/api/test-analytics-report', async (req, res) => {
         }
         return res.status(500).json({ success: false, error: err.message });
     }
+        } catch (err) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
 });
 
 
