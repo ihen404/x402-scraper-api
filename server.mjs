@@ -215,7 +215,6 @@ setInterval(() => {
 
 // Manifest alias for crawlers looking for .json
         res.status(500).json({ error: err.message });
-    }
 });
 
 // Manual test trigger endpoint for daily analytics webhook
