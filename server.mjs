@@ -241,3 +241,42 @@ res.json({ url, selector: selector || "body", extractedData: "Extracted content 
 res.status(500).json({ error: err.message });
 }
 });
+
+import nodemailer from "nodemailer";
+import cron from "node-cron";
+
+const transporter = nodemailer.createTransport({
+service: "gmail",
+auth: {
+user: process.env.EMAIL_USER,
+pass: process.env.EMAIL_PASS
+}
+});
+
+async function sendAnalyticsEmail(analyticsData) {
+const mailOptions = {
+from: process.env.EMAIL_USER,
+to: process.env.ALERT_EMAIL_RECIPIENT,
+subject: "Daily Scraper Analytics Report",
+text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
+};
+return await transporter.sendMail(mailOptions);
+}
+
+app.get("/test-email", async (req, res) => {
+try {
+await sendAnalyticsEmail({ message: "Test analytics report", timestamp: new Date().toISOString() });
+res.json({ status: "success", message: "Test email sent successfully!" });
+} catch (error) {
+res.status(500).json({ status: "error", error: error.message });
+}
+});
+
+cron.schedule("0 8 * * *", async () => {
+try {
+await sendAnalyticsEmail({ message: "Automated daily report", timestamp: new Date().toISOString() });
+console.log("Daily analytics email sent via cron.");
+} catch (error) {
+console.error("Cron email failed:", error);
+}
+}, { scheduled: true, timezone: "America/New_York" });
