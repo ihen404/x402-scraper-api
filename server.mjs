@@ -247,10 +247,17 @@ import cron from "node-cron";
 
 
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 async function sendAnalyticsEmail(analyticsData) {
+const apiKey = process.env.RESEND_API_KEY;
+if (!apiKey) {
+console.error("RESEND_API_KEY is missing from environment variables.");
+return { success: false, error: "Missing RESEND_API_KEY" };
+}
+
 try {
+const resend = new Resend(apiKey);
 const data = await resend.emails.send({
   from: "Scraper API <onboarding@resend.dev>",
   to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
@@ -262,6 +269,7 @@ return { success: true, data };
 } catch (error) {
 console.error("Error sending email via Resend:", error);
 return { success: false, error: error.message };
+}
 }
 }
 
