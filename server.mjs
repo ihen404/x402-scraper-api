@@ -214,6 +214,13 @@ res.status(200).json({ status: "online", service: "x402-scraper-api MCP endpoint
 
 // Batch scraping endpoint
 
+
+// Diagnostic environment check
+console.log("=== ENVIRONMENT DIAGNOSTICS ===");
+console.log("RESEND_API_KEY present:", !!process.env.RESEND_API_KEY);
+console.log("RESEND_API_KEY length:", process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.length : 0);
+console.log("All env keys:", Object.keys(process.env).filter(k => !k.includes('npm') && !k.includes('PATH')));
+
 async function sendAnalyticsEmail(analyticsData) {
 const apiKey = process.env.RESEND_API_KEY;
 if (!apiKey) {
