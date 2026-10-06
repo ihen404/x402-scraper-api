@@ -215,11 +215,37 @@ res.status(200).json({ status: "online", service: "x402-scraper-api MCP endpoint
 // Batch scraping endpoint
 
 
+
 async function sendAnalyticsEmail(analyticsData) {
 const apiKey = process.env.RESEND_API_KEY;
 if (!apiKey) {
 console.error("RESEND_API_KEY is missing from environment variables.");
 return { success: false, error: "Missing RESEND_API_KEY" };
+}
+
+try {
+const resend = new Resend(apiKey);
+console.log("Attempting to send email via Resend...");
+
+// Wrap the send call in a 5-second timeout promise to prevent hanging
+const sendPromise = resend.emails.send({
+  from: "Acme <onboarding@resend.dev>",
+  to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
+  subject: "Daily Scraper Analytics Report",
+  text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
+});
+
+const timeoutPromise = new Promise((_, reject) => 
+  setTimeout(() => reject(new Error("Resend API request timed out after 5 seconds")), 5000)
+);
+
+const data = await Promise.race([sendPromise, timeoutPromise]);
+console.log("Email sent successfully response:", data);
+return { success: true, data };
+} catch (error) {
+console.error("CRITICAL Error sending email via Resend:", error);
+return { success: false, error: error.message };
+}
 }
 
 try {
