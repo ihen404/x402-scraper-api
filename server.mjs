@@ -157,6 +157,33 @@ if (method === "tools/list") {
     id,
     result: {
       tools: [
+    {
+      name: "batch_scrape",
+      description: "Scrape multiple webpage URLs concurrently with x402 payment support",
+      inputSchema: {
+        type: "object",
+        properties: {
+          urls: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of URLs to scrape"
+          }
+        },
+        required: ["urls"]
+      }
+    },
+    {
+      name: "extract_metadata",
+      description: "Extract specific metadata or targeted selector content from a webpage",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL to scrape and extract from" },
+          selector: { type: "string", description: "CSS selector to target (optional)" }
+        },
+        required: ["url"]
+      }
+    },
         {
           name: "scrape",
           description: "Scrape a webpage URL with x402 payment support",
