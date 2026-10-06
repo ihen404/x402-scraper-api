@@ -213,76 +213,7 @@ res.status(200).json({ status: "online", service: "x402-scraper-api MCP endpoint
 });
 
 // Batch scraping endpoint
-app.post("/scrape/batch", async (req, res) => {
-const { urls } = req.body;
-if (!Array.isArray(urls)) {
-return res.status(400).json({ error: "Please provide an array of URLs in the urls field." });
-}
 
-try {
-const results = await Promise.allSettled(
-  urls.map(async (url) => {
-    return { url, status: "success", data: `Scraped content for ${url}` };
-  })
-);
-res.json({ results });
-} catch (err) {
-res.status(500).json({ error: err.message });
-}
-});
-
-// Detailed metadata extraction endpoint
-app.post("/extract", async (req, res) => {
-const { url, selector } = req.body;
-if (!url) return res.status(400).json({ error: "URL is required" });
-
-try {
-res.json({ url, selector: selector || "body", extractedData: "Extracted content placeholder" });
-} catch (err) {
-res.status(500).json({ error: err.message });
-}
-});
-
-import cron from "node-cron";
-
-
-
-
-
-try {
-const resend = new Resend(apiKey);
-const data = await resend.emails.send({
-  from: "Scraper API <onboarding@resend.dev>",
-  to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
-  subject: "Daily Scraper Analytics Report",
-  text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
-});
-console.log("Email sent successfully:", data);
-return { success: true, data };
-} catch (error) {
-console.error("Error sending email via Resend:", error);
-return { success: false, error: error.message };
-}
-}
-}
-
-app.get("/test-email", async (req, res) => {
-try {
-await sendAnalyticsEmail({ message: "Test analytics report", timestamp: new Date().toISOString() });
-res.json({ status: "success", message: "Test email sent successfully!" });
-} catch (error) {
-res.status(500).json({ status: "error", error: error.message });
-}
-});
-
-cron.schedule("0 8 * * *", async () => {
-try {
-await sendAnalyticsEmail({ message: "Automated daily report", timestamp: new Date().toISOString() });
-console.log("Daily analytics email sent via cron.");
-} catch (error) {
-console.error("Cron email failed:", error);
-}
-}, { scheduled: true, timezone: "America/New_York" });
 
 async function sendAnalyticsEmail(analyticsData) {
 const apiKey = process.env.RESEND_API_KEY;
@@ -293,6 +224,23 @@ return { success: false, error: "Missing RESEND_API_KEY" };
 
 try {
 const resend = new Resend(apiKey);
+console.log("Attempting to send email via Resend to:", process.env.ALERT_EMAIL_RECIPIENT);
+const data = await resend.emails.send({
+  from: "Acme <onboarding@resend.dev>",
+  to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
+  subject: "Daily Scraper Analytics Report",
+  text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
+});
+console.log("Email sent successfully response:", data);
+return { success: true, data };
+} catch (error) {
+console.error("CRITICAL Error sending email via Resend:", error);
+return { success: false, error: error.message };
+}
+}
+
+try {
+const resend = new Resend(apiKey);
 const data = await resend.emails.send({
   from: "Scraper API <onboarding@resend.dev>",
   to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
@@ -306,3 +254,23 @@ console.error("Error sending email via Resend:", error);
 return { success: false, error: error.message };
 }
 }
+
+// Test email endpoint
+app.get('/test-email', async (req, res) => {
+try {
+const sampleData = {
+  timestamp: new Date().toISOString(),
+  message: "Test analytics report from x402-scraper-api via Resend",
+  status: "operational"
+};
+const result = await sendAnalyticsEmail(sampleData);
+if (result.success) {
+  return res.status(200).json({ status: "success", data: result.data });
+} else {
+  return res.status(500).json({ status: "error", error: result.error });
+}
+} catch (error) {
+console.error("Error in /test-email endpoint:", error);
+return res.status(500).json({ status: "error", error: error.message });
+}
+});
