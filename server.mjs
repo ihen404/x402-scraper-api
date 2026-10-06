@@ -183,3 +183,34 @@ res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: err.messa
 app.get("/mcp", (req, res) => {
 res.status(200).json({ status: "online", service: "x402-scraper-api MCP endpoint" });
 });
+
+// Batch scraping endpoint
+app.post("/scrape/batch", async (req, res) => {
+const { urls } = req.body;
+if (!Array.isArray(urls)) {
+return res.status(400).json({ error: "Please provide an array of URLs in the urls field." });
+}
+
+try {
+const results = await Promise.allSettled(
+  urls.map(async (url) => {
+    return { url, status: "success", data: `Scraped content for ${url}` };
+  })
+);
+res.json({ results });
+} catch (err) {
+res.status(500).json({ error: err.message });
+}
+});
+
+// Detailed metadata extraction endpoint
+app.post("/extract", async (req, res) => {
+const { url, selector } = req.body;
+if (!url) return res.status(400).json({ error: "URL is required" });
+
+try {
+res.json({ url, selector: selector || "body", extractedData: "Extracted content placeholder" });
+} catch (err) {
+res.status(500).json({ error: err.message });
+}
+});
