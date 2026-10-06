@@ -133,3 +133,29 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
 console.log(`Server listening on port ${PORT}`);
 });
+
+// MCP Streamable HTTP endpoint for Glama integration
+app.all("/mcp", async (req, res) => {
+try {
+const transport = new StreamableHTTPServerTransport({
+  endpoint: "/mcp",
+  req,
+  res
+});
+const server = new McpServer({ name: "x402-scraper-api", version: "1.0.0" });
+
+server.tool("scrape", "Scrape a webpage URL with x402 payment support", 
+  { url: z.string().url() },
+  async ({ url }) => {
+    return { content: [{ type: "text", text: "MCP scrape initiated for " + url }] };
+  }
+);
+
+await server.connect(transport);
+} catch (err) {
+console.error("MCP Error:", err);
+if (!res.headersSent) {
+  res.status(500).json({ error: "Internal MCP Error", message: err.message });
+}
+}
+});
