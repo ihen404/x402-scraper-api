@@ -1,3 +1,4 @@
+import { Resend } from "resend";
 import TurndownService from "turndown";
 import { verifyX402Payment } from "./src/middleware/payment.js";
 import express from "express";
@@ -242,28 +243,26 @@ res.status(500).json({ error: err.message });
 }
 });
 
-import nodemailer from "nodemailer";
 import cron from "node-cron";
 
-const transporter = nodemailer.createTransport({
-host: "smtp.gmail.com",
-port: 587,
-  secure: false,
-auth: {
-user: process.env.EMAIL_USER,
-pass: process.env.EMAIL_PASS
-},
-family: 4
-});
+
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendAnalyticsEmail(analyticsData) {
-const mailOptions = {
-from: process.env.EMAIL_USER,
-to: process.env.ALERT_EMAIL_RECIPIENT,
-subject: "Daily Scraper Analytics Report",
-text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
-};
-return await transporter.sendMail(mailOptions);
+try {
+const data = await resend.emails.send({
+  from: "Scraper API <onboarding@resend.dev>",
+  to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
+  subject: "Daily Scraper Analytics Report",
+  text: `Here is your daily analytics report:\n\n${JSON.stringify(analyticsData, null, 2)}`
+});
+console.log("Email sent successfully:", data);
+return { success: true, data };
+} catch (error) {
+console.error("Error sending email via Resend:", error);
+return { success: false, error: error.message };
+}
 }
 
 app.get("/test-email", async (req, res) => {
