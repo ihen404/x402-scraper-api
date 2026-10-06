@@ -52,7 +52,13 @@ res.json({
 });
 
 // 1. Scrape Endpoint
-app.post("/api/scrape", authenticateApiKey, async (req, res) => {
+app.post("/api/scrape", async (req, res, next) => {
+    const verification = await verifyX402Payment(req.headers);
+    if (!verification.isValid) {
+        return res.status(402).json({ error: "Payment Required", message: verification.error, cost: "$0.001", network: "base" });
+    }
+    next();
+},  async (req, res) => {
 try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: "Bad Request", message: "A target URL is required." });
