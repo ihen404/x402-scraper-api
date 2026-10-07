@@ -270,3 +270,15 @@ console.error("Error in /test-email endpoint:", error);
 return res.status(500).json({ status: "error", error: error.message });
 }
 });
+
+app.get('/test-scraper-error', async (req, res) => {
+  try {
+    throw new Error('Target selector not found: price element missing');
+  } catch (error) {
+    const result = await sendAlertEmail({
+      subject: 'Scraper Error Alert',
+      message: error.message
+    });
+    res.status(500).json({ status: 'error_handled', error: error.message, emailResult: result });
+  }
+});
