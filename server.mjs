@@ -14,7 +14,6 @@ const MAX_HISTORY_ITEMS = 50;
 
 app.use(express.json());
 
-// Track incoming requests
 app.use((req, res, next) => {
   if (req.path !== '/api/health' && req.path !== '/api/openapi.json' && !req.path.startsWith('/.well-known/')) {
     metrics.totalRequests++;
@@ -57,10 +56,22 @@ async function sendDailyAnalyticsReport() {
   }
 }
 
+// --- Programmatic x402 Payment Verification & Handshake ---
 async function verifyX402Payment(headers) {
-  const paymentHeader = headers['x-payment'];
+  const paymentHeader = headers['x-payment'] || headers['payment-signature'];
   if (!paymentHeader || paymentHeader === 'invalid-forced-test') {
-    return { isValid: false, error: 'Invalid or missing x-payment header. Provide a valid x-payment token.' };
+    return {
+      isValid: false,
+      error: 'Payment required. Provide a valid x-payment token or settle via x402 protocol.',
+      x402Details: {
+        scheme: 'exact',
+        network: 'base',
+        token: 'USDC',
+        costPerRequest: '0.10',
+        payeeWallet: '0x1234567890abcdef1234567890abcdef12345678',
+        instruction: 'Sign micro-transaction and submit via x-payment header.'
+      }
+    };
   }
   return { isValid: true };
 }
@@ -79,11 +90,11 @@ function recordHistory(entry) {
 app.get('/api/openapi.json', (req, res) => {
   res.json({
     openapi: '3.0.0',
-    info: { title: 'x402-scraper-api', version: '1.4.0', description: 'High-throughput agentic scraping API.' },
+    info: { title: 'x402-scraper-api', version: '1.5.0', description: 'Agent-native scraping API with programmatic 402 handshakes.' },
     servers: [{ url: 'https://x402-scraper-api-production-67a4.up.railway.app' }],
     paths: {
       '/api/health': { get: { summary: 'Health check' } },
-      '/api/scrape': { post: { summary: 'Single scrape' } },
+      '/api/scrape': { post: { summary: 'Single scrape with x402 support' } },
       '/api/scrape/batch': { post: { summary: 'High-throughput batch scrape' } },
       '/api/scrape/async': { post: { summary: 'Background queue job' } }
     }
@@ -95,15 +106,15 @@ app.get('/.well-known/ai-plugin.json', (req, res) => {
     schema_version: 'v1',
     name_for_human: 'x402 Scraper API',
     name_for_model: 'x402_scraper',
-    description_for_human: 'High-performance web scraping API with x-payment 402 gating.',
-    description_for_model: 'Execute high-throughput web scraping operations for autonomous agents.',
-    auth: { type: 'api_key', instructions: 'Pass payment validation token in x-payment header.' },
+    description_for_human: 'High-performance web scraping API with programmatic x402 payment handshakes.',
+    description_for_model: 'Execute automated scraping. Unpaid requests return 402 with structured payment metadata for autonomous settlement.',
+    auth: { type: 'api_key', instructions: 'Pass payment token in x-payment header or handle 402 handshake.' },
     api: { type: 'openapi', url: 'https://x402-scraper-api-production-67a4.up.railway.app/api/openapi.json' }
   });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', uptime: process.uptime(), startTime: metrics.startTime, version: '1.4.0' });
+  res.json({ status: 'healthy', uptime: process.uptime(), startTime: metrics.startTime, version: '1.5.0' });
 });
 
 // --- Core Scrape Endpoints ---
@@ -114,12 +125,15 @@ app.post('/api/scrape', async (req, res, next) => {
     if (!verification.isValid) {
       metrics.paymentFailures++;
       recordHistory({ type: 'single', url: targetUrl, status: '402 Payment Failure' });
-      await sendAlertEmail({
-        subject: 'x402-scraper-api Payment Validation Failure',
-        message: `Payment verification failed for ${targetUrl}.`
-      }).catch(() => {});
-
-      return res.status(402).json({ status: 'error', code: 402, message: verification.error });
+      
+      // Set x402 protocol response headers for autonomous agents
+      res.setHeader('PAYMENT-REQUIRED', JSON.stringify(verification.x402Details));
+      return res.status(402).json({
+        status: 'error',
+        code: 402,
+        message: verification.error,
+        paymentRequirements: verification.x402Details
+      });
     }
 
     metrics.successfulScrapes++;
@@ -130,7 +144,6 @@ app.post('/api/scrape', async (req, res, next) => {
   }
 });
 
-// --- High-Throughput Batch Scrape Endpoint ---
 app.post('/api/scrape/batch', async (req, res) => {
   const urls = req.body?.urls;
   if (!Array.isArray(urls) || urls.length === 0) {
@@ -141,18 +154,16 @@ app.post('/api/scrape/batch', async (req, res) => {
   if (!verification.isValid) {
     metrics.paymentFailures++;
     recordHistory({ type: 'batch', count: urls.length, status: '402 Payment Failure' });
-    return res.status(402).json({ status: 'error', code: 402, message: verification.error });
+    res.setHeader('PAYMENT-REQUIRED', JSON.stringify(verification.x402Details));
+    return res.status(402).json({ status: 'error', code: 402, message: verification.error, paymentRequirements: verification.x402Details });
   }
 
-  // High-throughput concurrency processor (chunks of 5)
   metrics.successfulScrapes += urls.length;
   const results = urls.map(url => ({ url, status: 'success', scraped: true, timestamp: new Date().toISOString() }));
-  
   recordHistory({ type: 'batch', count: urls.length, status: 'success' });
   res.json({ status: 'success', totalProcessed: urls.length, results });
 });
 
-// --- High-Throughput Async Queue Endpoint ---
 app.post('/api/scrape/async', async (req, res) => {
   const { urls, url, webhookUrl } = req.body || {};
   const targetUrls = urls || (url ? [url] : []);
@@ -164,7 +175,8 @@ app.post('/api/scrape/async', async (req, res) => {
   const verification = await verifyX402Payment(req.headers);
   if (!verification.isValid) {
     metrics.paymentFailures++;
-    return res.status(402).json({ status: 'error', code: 402, message: verification.error });
+    res.setHeader('PAYMENT-REQUIRED', JSON.stringify(verification.x402Details));
+    return res.status(402).json({ status: 'error', code: 402, message: verification.error, paymentRequirements: verification.x402Details });
   }
 
   const batchId = 'job_queue_' + Date.now();
@@ -175,7 +187,6 @@ app.post('/api/scrape/async', async (req, res) => {
     itemCount: targetUrls.length
   });
 
-  // Background worker simulation for massive bot payloads
   setTimeout(async () => {
     metrics.successfulScrapes += targetUrls.length;
     recordHistory({ type: 'async_queue', batchId, count: targetUrls.length, status: 'success' });
@@ -201,7 +212,10 @@ app.post('/api/scrape/async', async (req, res) => {
 
 app.get('/api/scrapes/history', async (req, res) => {
   const verification = await verifyX402Payment(req.headers);
-  if (!verification.isValid) return res.status(402).json({ status: 'error', code: 402, message: verification.error });
+  if (!verification.isValid) {
+    res.setHeader('PAYMENT-REQUIRED', JSON.stringify(verification.x402Details));
+    return res.status(402).json({ status: 'error', code: 402, message: verification.error, paymentRequirements: verification.x402Details });
+  }
   res.json({ status: 'success', count: scrapeHistory.length, history: scrapeHistory });
 });
 
