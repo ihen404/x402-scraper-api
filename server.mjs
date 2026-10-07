@@ -87,6 +87,14 @@ try {
         metadata: { costUsdc: "0.0010" } 
     });
 } catch (err) {
+    try {
+        await sendAlertEmail({
+            subject: 'Production Scraper Error Alert',
+            message: `Scraper failed for URL: ${req.body?.url || 'Unknown'}. Error: ${err.message}`
+        });
+    } catch (emailErr) {
+        console.error('Failed to send error alert email:', emailErr);
+    }
     res.status(500).json({ error: "Internal Server Error", message: err.message });
 }
 });
