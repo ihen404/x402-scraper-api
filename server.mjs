@@ -114,6 +114,14 @@ try {
         metadata: { crawledAt: new Date().toISOString(), costUsdc: "0.0050" } 
     });
 } catch (err) {
+    try {
+        await sendAlertEmail({
+            subject: "API Endpoint Error Alert",
+            message: `Error encountered in service. Message: ${err.message}`
+        });
+    } catch (emailErr) {
+        console.error("Failed to send error alert email:", emailErr);
+    }
     res.status(500).json({ error: "Internal Server Error", message: err.message });
 }
 });
@@ -133,6 +141,14 @@ try {
         metadata: { costUsdc: "0.0030" } 
     });
 } catch (err) {
+    try {
+        await sendAlertEmail({
+            subject: "API Endpoint Error Alert",
+            message: `Error encountered in service. Message: ${err.message}`
+        });
+    } catch (emailErr) {
+        console.error("Failed to send error alert email:", emailErr);
+    }
     res.status(500).json({ error: "Internal Server Error", message: err.message });
 }
 });
@@ -149,6 +165,14 @@ try {
         metadata: { capturedAt: new Date().toISOString(), costUsdc: "0.0015" }
     });
 } catch (err) {
+    try {
+        await sendAlertEmail({
+            subject: "API Endpoint Error Alert",
+            message: `Error encountered in service. Message: ${err.message}`
+        });
+    } catch (emailErr) {
+        console.error("Failed to send error alert email:", emailErr);
+    }
     res.status(500).json({ error: "Internal Server Error", message: err.message });
 }
 });
