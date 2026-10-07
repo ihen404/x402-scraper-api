@@ -1,3 +1,18 @@
+
+async function sendAlertEmail({ subject, message }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is missing');
+  }
+  const resend = new Resend(apiKey);
+  return await resend.emails.send({
+    from: "Acme <onboarding@resend.dev>",
+    to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
+    subject: subject,
+    html: `<p>${message}</p>`
+  });
+}
+
 import { Resend } from "resend";
 import TurndownService from "turndown";
 import { verifyX402Payment } from "./src/middleware/payment.js";
