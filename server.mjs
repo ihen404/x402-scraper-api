@@ -1,69 +1,32 @@
 
 async function sendAlertEmail({ subject, message }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY is missing');
+    throw new Error('BREVO_API_KEY is missing');
   }
-  const resend = new Resend(apiKey);
-  return await resend.emails.send({
-    from: "Acme <onboarding@resend.dev>",
-    to: process.env.ALERT_EMAIL_RECIPIENT || "delivered@resend.dev",
-    subject: subject,
-    html: `<p>${message}</p>`
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': apiKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: "x402 Scraper Alerts", email: "ihentrel@hotmail.com" },
+      to: [{ email: process.env.ALERT_EMAIL_RECIPIENT || "ihentrel@hotmail.com" }],
+      subject: subject,
+      htmlContent: `<p>${message}</p>`
+    })
   });
-}
 
-import { Resend } from "resend";
-import TurndownService from "turndown";
-import { verifyX402Payment } from "./src/middleware/payment.js";
-import express from "express";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
-
-async function sendDailyAnalyticsReport() {
-console.log("Analytics report skipped.");
-}
-
-const app = express();
-app.use(express.json());
-
-// Middleware placeholder if not fully defined elsewhere
-const authenticateApiKey = (req, res, next) => {
-const apiKey = req.headers["x-api-key"] || req.query.api_key;
-if (!apiKey && process.env.NODE_ENV === "production") {
-    return res.status(402).json({ error: "Unauthorized", message: "API key required." });
-}
-next();
-};
-
-const requireX402Payment = (cost) => (req, res, next) => next();
-
-// Health Check
-app.get("/", (req, res) => {
-    res.json({ name: "x402 Scraper API", status: "active", docs: "/.well-known/x402.json" });
-});
-
-app.get("/health", (req, res) => {
-res.json({ status: "healthy", timestamp: new Date().toISOString() });
-});
-
-// x402 Manifest
-app.get("/.well-known/x402", (req, res) => res.redirect("/.well-known/x402.json"));
-
-app.get("/.well-known/x402.json", (req, res) => {
-res.json({
-    name: "x402 Scraper API",
-    version: "1.0",
-    x402_version: "1.0",
-    network: "base",
-    payment_address: process.env.PAYMENT_ADDRESS || "0x0000000000000000000000000000000000000000",
-    endpoints: {
-        scrape: "/api/scrape",
-        crawl: "/api/crawl",
-        render: "/api/render",
-        screenshot: "/api/screenshot"
-    }
+  const result = await response.json();
+  if (!response.ok) {
+    console.error("Brevo API Error:", result);
+    throw new Error(result.message || 'Failed to send email via Brevo');
+  }
+  console.log("Brevo Email Dispatched Successfully:", result);
+  return result;
 });
 });
 
