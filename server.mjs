@@ -1,16 +1,15 @@
-
 async function sendAlertEmail({ subject, message }) {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    throw new Error('BREVO_API_KEY is missing');
+    throw new Error("BREVO_API_KEY is missing");
   }
 
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
     headers: {
-      'accept': 'application/json',
-      'api-key': apiKey,
-      'content-type': 'application/json'
+      "accept": "application/json",
+      "api-key": apiKey,
+      "content-type": "application/json"
     },
     body: JSON.stringify({
       sender: { name: "x402 Scraper Alerts", email: "ihentrel@hotmail.com" },
@@ -23,13 +22,14 @@ async function sendAlertEmail({ subject, message }) {
   const result = await response.json();
   if (!response.ok) {
     console.error("Brevo API Error:", result);
-    throw new Error(result.message || 'Failed to send email via Brevo');
+    throw new Error(result.message || "Failed to send email via Brevo");
   }
   console.log("Brevo Email Dispatched Successfully:", result);
   return result;
-});
+}
 
 // 1. Scrape Endpoint
+
 app.post("/api/scrape", async (req, res, next) => {
     const verification = await verifyX402Payment(req.headers);
     if (!verification.isValid) {
