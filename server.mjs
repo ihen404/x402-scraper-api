@@ -28,7 +28,6 @@ async function sendAlertEmail({ subject, message }) {
   console.log("Brevo Email Dispatched Successfully:", result);
   return result;
 });
-});
 
 // 1. Scrape Endpoint
 app.post("/api/scrape", async (req, res, next) => {
