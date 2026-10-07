@@ -47,37 +47,20 @@ async function sendAlertEmail({ subject, message }) {
   return result;
 }
 
-// --- Slack Webhook Daily Analytics Report Function ---
+// --- Email Analytics Report Function ---
 async function sendDailyAnalyticsReport() {
-  const webhookUrl = process.env.DAILY_ANALYTICS_WEBHOOK_URL;
-  if (!webhookUrl) {
-    console.error('DAILY_ANALYTICS_WEBHOOK_URL is missing');
-    return;
-  }
-
-  const payload = {
-    text: `📊 *x402-scraper-api Daily Analytics Report*\n` +
-          `• *Uptime Start:* ${metrics.startTime}\n` +
-          `• *Total Requests:* ${metrics.totalRequests}\n` +
-          `• *Successful Scrapes:* ${metrics.successfulScrapes}\n` +
-          `• *Payment Failures (402):* ${metrics.paymentFailures}`
-  };
+  const subject = '📊 x402-scraper-api Analytics Report';
+  const message = `<strong>x402-scraper-api Analytics Report</strong><br>` +
+                  `• <strong>Uptime Start:</strong> ${metrics.startTime}<br>` +
+                  `• <strong>Total Requests:</strong> ${metrics.totalRequests}<br>` +
+                  `• <strong>Successful Scrapes:</strong> ${metrics.successfulScrapes}<br>` +
+                  `• <strong>Payment Failures (402):</strong> ${metrics.paymentFailures}`;
 
   try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Slack API Error: ${response.status} - ${errText}`);
-    }
-
-    console.log('Daily analytics report dispatched successfully.');
+    await sendAlertEmail({ subject, message });
+    console.log('Daily analytics email report dispatched successfully.');
   } catch (err) {
-    console.error('Failed to send daily analytics report:', err.message);
+    console.error('Failed to send daily analytics email report:', err.message);
   }
 }
 
@@ -120,7 +103,7 @@ app.post('/api/scrape', async (req, res, next) => {
 // 2. Manual Trigger Endpoint for Analytics
 app.post('/api/analytics/trigger', async (req, res) => {
   await sendDailyAnalyticsReport();
-  res.json({ status: 'success', message: 'Analytics report triggered.' });
+  res.json({ status: 'success', message: 'Analytics report email triggered.' });
 });
 
 // 3. Automated 24-Hour Cron Schedule
