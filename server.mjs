@@ -9,15 +9,14 @@ let metrics = {
   startTime: new Date().toISOString()
 };
 
-// In-memory audit log for scrape history
 let scrapeHistory = [];
 const MAX_HISTORY_ITEMS = 50;
 
 app.use(express.json());
 
-// Track all incoming requests (excluding health checks to keep metrics clean)
+// Track incoming requests (excluding health and discovery metadata)
 app.use((req, res, next) => {
-  if (req.path !== '/api/health') {
+  if (req.path !== '/api/health' && req.path !== '/api/openapi.json' && !req.path.startsWith('/.well-known/')) {
     metrics.totalRequests++;
   }
   next();
@@ -52,7 +51,6 @@ async function sendAlertEmail({ subject, message }) {
   return result;
 }
 
-// --- Analytics Report Function ---
 async function sendDailyAnalyticsReport() {
   const subject = '📊 x402-scraper-api Analytics Report';
   const message = `<strong>x402-scraper-api Analytics Report</strong><br>` +
@@ -72,12 +70,11 @@ async function sendDailyAnalyticsReport() {
 async function verifyX402Payment(headers) {
   const paymentHeader = headers['x-payment'];
   if (!paymentHeader || paymentHeader === 'invalid-forced-test') {
-    return { isValid: false, error: 'Invalid or missing x-payment header' };
+    return { isValid: false, error: 'Invalid or missing x-payment header. Provide a valid x-payment token.' };
   }
   return { isValid: true };
 }
 
-// Helper to log history
 function recordHistory(entry) {
   scrapeHistory.unshift({
     timestamp: new Date().toISOString(),
@@ -88,17 +85,87 @@ function recordHistory(entry) {
   }
 }
 
-// --- 1. Public Health Check Endpoint ---
+// --- 1. Machine-Readable Discovery: OpenAPI Spec ---
+app.get('/api/openapi.json', (req, res) => {
+  res.json({
+    openapi: '3.0.0',
+    info: {
+      title: 'x402-scraper-api',
+      version: '1.3.0',
+      description: 'Payment-gated (402) web scraping API optimized for AI agents, bots, and enterprise workflows.'
+    },
+    servers: [
+      { url: 'https://x402-scraper-api-production-67a4.up.railway.app' }
+    ],
+    paths: {
+      '/api/health': {
+        get: {
+          summary: 'Public health check',
+          responses: { '200': { description: 'Service is healthy' } }
+        }
+      },
+      '/api/scrape': {
+        post: {
+          summary: 'Scrape a single target URL',
+          parameters: [{ name: 'x-payment', in: 'header', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { type: 'object', properties: { url: { type: 'string' } } } } }
+          },
+          responses: {
+            '200': { description: 'Successful scrape' },
+            '402': { description: 'Payment required / missing x-payment header' }
+          }
+        }
+      },
+      '/api/scrape/batch': {
+        post: {
+          summary: 'Batch scrape multiple URLs',
+          parameters: [{ name: 'x-payment', in: 'header', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { type: 'object', properties: { urls: { type: 'array', items: { type: 'string' } } } } } }
+          },
+          responses: {
+            '200': { description: 'Batch processed successfully' },
+            '402': { description: 'Payment required' }
+          }
+        }
+      }
+    }
+  });
+});
+
+// --- 2. Machine-Readable Discovery: AI Plugin Manifest ---
+app.get('/.well-known/ai-plugin.json', (req, res) => {
+  res.json({
+    schema_version: 'v1',
+    name_for_human: 'x402 Scraper API',
+    name_for_model: 'x402_scraper',
+    description_for_human: 'High-performance web scraping API with x-payment 402 gating.',
+    description_for_model: 'Execute web scraping operations (single, batch, or async) by providing a valid x-payment header token.',
+    auth: {
+      type: 'api_key',
+      instructions: 'Pass payment validation token in the x-payment request header.'
+    },
+    api: {
+      type: 'openapi',
+      url: 'https://x402-scraper-api-production-67a4.up.railway.app/api/openapi.json'
+    }
+  });
+});
+
+// --- 3. Public Health Check Endpoint ---
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     uptime: process.uptime(),
     startTime: metrics.startTime,
-    version: '1.2.0'
+    version: '1.3.0'
   });
 });
 
-// --- 2. Standard Scrape Endpoint ---
+// --- 4. Standard Scrape Endpoint ---
 app.post('/api/scrape', async (req, res, next) => {
   const targetUrl = req.body?.url || 'unknown';
   try {
@@ -127,7 +194,7 @@ app.post('/api/scrape', async (req, res, next) => {
   }
 });
 
-// --- 3. Batch Scrape Endpoint ---
+// --- 5. Batch Scrape Endpoint ---
 app.post('/api/scrape/batch', async (req, res) => {
   const urls = req.body?.urls;
   if (!Array.isArray(urls) || urls.length === 0) {
@@ -148,7 +215,7 @@ app.post('/api/scrape/batch', async (req, res) => {
   res.json({ status: 'success', totalProcessed: urls.length, results });
 });
 
-// --- 4. Async Scrape Endpoint ---
+// --- 6. Async Scrape Endpoint ---
 app.post('/api/scrape/async', async (req, res) => {
   const { url, webhookUrl } = req.body || {};
   if (!url) {
@@ -161,14 +228,12 @@ app.post('/api/scrape/async', async (req, res) => {
     return res.status(402).json({ status: 'error', code: 402, message: verification.error });
   }
 
-  // Accept immediately with 202
   res.status(202).json({
     status: 'accepted',
     message: 'Scrape job accepted for background processing',
     jobId: 'job_' + Date.now()
   });
 
-  // Perform background scrape simulation & optional webhook dispatch
   setTimeout(async () => {
     metrics.successfulScrapes++;
     recordHistory({ type: 'async', url, status: 'success' });
@@ -179,7 +244,6 @@ app.post('/api/scrape/async', async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'completed', url, data: { scraped: true } })
         });
-        console.log(`Webhook dispatched to ${webhookUrl}`);
       } catch (webhookErr) {
         console.error('Failed to dispatch async webhook:', webhookErr.message);
       }
@@ -187,7 +251,7 @@ app.post('/api/scrape/async', async (req, res) => {
   }, 3000);
 });
 
-// --- 5. Scrape History Audit Endpoint ---
+// --- 7. Scrape History Audit Endpoint ---
 app.get('/api/scrapes/history', async (req, res) => {
   const verification = await verifyX402Payment(req.headers);
   if (!verification.isValid) {
@@ -196,13 +260,13 @@ app.get('/api/scrapes/history', async (req, res) => {
   res.json({ status: 'success', count: scrapeHistory.length, history: scrapeHistory });
 });
 
-// --- 6. Manual Trigger Endpoint for Analytics ---
+// --- 8. Manual Trigger Endpoint for Analytics ---
 app.post('/api/analytics/trigger', async (req, res) => {
   await sendDailyAnalyticsReport();
   res.json({ status: 'success', message: 'Analytics report email triggered.' });
 });
 
-// --- 7. Automated 24-Hour Cron Schedule ---
+// --- 9. Automated 24-Hour Cron Schedule ---
 setInterval(() => {
   sendDailyAnalyticsReport();
 }, 24 * 60 * 60 * 1000);
