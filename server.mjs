@@ -1,6 +1,13 @@
 import express from 'express';
 
 const app = express();
+
+let metrics = {
+totalRequests: 0,
+successfulScrapes: 0,
+paymentFailures: 0,
+startTime: new Date().toISOString()
+};
 app.use(express.json());
 
 async function sendAlertEmail({ subject, message }) {
