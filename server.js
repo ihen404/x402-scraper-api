@@ -10,15 +10,22 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
-pool.query(`
-  CREATE TABLE IF NOT EXISTS scraper_metrics (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20),
-    latency_ms INT,
-    revenue_usdc NUMERIC(10,2) DEFAULT 0.00
-  )
-`).catch(err => console.error("DB init error:", err));
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scraper_metrics (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20),
+        latency_ms INT,
+        revenue_usdc NUMERIC(10,2) DEFAULT 0.00
+      );
+    `);
+    console.log("Database initialized successfully");
+  } catch (err) {
+    console.error("DB init warning (non-fatal):", err.message);
+  }
+})(););
 
 app.post("/api/internal/run-batch-scrape", async (req, res) => {
   try {
@@ -40,7 +47,7 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
     return res.json({ status: "success", recorded: results.length, details: results });
   } catch (err) {
     console.error("Batch error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.toString(), code: err.code || "UNKNOWN" });
   }
 });
 
