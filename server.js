@@ -54,16 +54,6 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.get("/api/internal/debug-db", (req, res) => {
-  const url = process.env.DATABASE_URL || "NOT_SET";
-  // Mask password for safety
-  const masked = url.replace(/:([^:@]+)@/, ":****@");
-  return res.json({
-    hasDatabaseUrl: !!process.env.DATABASE_URL,
-    databaseUrlLength: url.length,
-    maskedUrl: masked,
-    nodeEnv: process.env.NODE_ENV
-  });
 });
 
 
