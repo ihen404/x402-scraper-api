@@ -7,7 +7,6 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
-// Initialize table
 pool.query(`
   CREATE TABLE IF NOT EXISTS scraper_metrics (
     id SERIAL PRIMARY KEY,
@@ -16,7 +15,11 @@ pool.query(`
     latency_ms INT,
     revenue_usdc NUMERIC(10,2) DEFAULT 0.00
   )
-catch(err => console.error("DB init error:", err));
+`).catch(err => console.error("DB init error:", err));
+
+import pkg from "pg";
+const { Pool } = pkg;
+
 
 import puppeteer from "puppeteer";
 
