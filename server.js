@@ -1,3 +1,35 @@
+
+import pkg from "pg";
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+});
+
+// Initialize table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS scraper_metrics (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20),
+    latency_ms INT,
+    revenue_usdc NUMERIC(10,2) DEFAULT 0.00
+  )
+catch(err => console.error("DB init error:", err));
+
+import puppeteer from "puppeteer";
+
+let sharedBrowser = null;
+async function getBrowser() {
+  if (!sharedBrowser || !sharedBrowser.connected) {
+    sharedBrowser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    });
+  }
+  return sharedBrowser;
+}
 import pkg from "pg";
 const { Pool } = pkg;
 import express from "express";
