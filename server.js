@@ -216,8 +216,8 @@ app.post("/api/internal/send-analytics", async (req, res) => {
 });
 
 
-import pkgPg from "pg";
-const { Pool } = pkgPg;
+import pgPkg from "pg";
+const { Pool } = pgPkg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
@@ -236,7 +236,7 @@ pool.query(`
 app.post("/api/internal/run-batch-scrape", async (req, res) => {
   const secret = req.headers["x-cron-secret"];
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: "Unauthorized cron trigger" });
+    return res.status(401).json({ error: "Unauthorized" });
   }
   try {
     const results = [];
@@ -250,10 +250,9 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
       );
       results.push({ status: success ? "success" : "failed", latency_ms: latency, revenue_usdc: rev });
     }
-    return res.status(200).json({ status: "success", recorded: results.length, details: results });
+    return res.json({ status: "success", recorded: results.length });
   } catch (err) {
-    console.error("Batch error:", err);
-    return res.status(500).json({ status: "error", message: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
