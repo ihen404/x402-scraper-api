@@ -1,4 +1,5 @@
-const { Pool } = require("pg");
+import pkg from "pg";
+const { Pool } = pkg;
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
