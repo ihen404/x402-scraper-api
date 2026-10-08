@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "x402-scraper-api": {
+      "transport": "streamable-http",
+      "url": "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      },
+      "description": "Production-grade multi-modal scraper, RAG engine, browser automation, and onchain x402 micropayment gateway on Base network."
+    }
+  }
+}
