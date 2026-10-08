@@ -1,11 +1,13 @@
-const express = require('express');
-const puppeteer = require('puppeteer');
+import express from 'express';
+import puppeteer from 'puppeteer';
+import { Resend } from 'resend';
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const PAYEE_WALLET = process.env.PAYEE_WALLET || "0x1234567890abcdef1234567890abcdef12345678";
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const PAYMENT_REQUIREMENTS = {
   scheme: "exact",
@@ -118,13 +120,6 @@ app.post('/api/scrape', x402Middleware, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`x402 Scraper API running on port ${PORT}`);
-});
-
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Daily Analytics Cron Endpoint with Resend Email Dispatch
 app.post('/api/internal/send-analytics', async (req, res) => {
   const secret = req.headers['x-cron-secret'];
@@ -173,4 +168,8 @@ app.post('/api/internal/send-analytics', async (req, res) => {
     console.error("Failed to send analytics email:", err);
     return res.status(500).json({ status: "error", message: err.message });
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`x402 Scraper API running on port ${PORT}`);
 });
