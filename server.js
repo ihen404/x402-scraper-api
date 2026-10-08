@@ -1,3 +1,4 @@
+const { Pool } = require("pg");
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
@@ -122,9 +123,6 @@ app.post("/api/scrape", x402Middleware, async (req, res) => {
 
 app.post("/api/internal/send-analytics", async (req, res) => {
   const secret = req.headers["x-cron-secret"];
-  
-  console.log("Incoming cron secret attempt:", secret ? "Provided" : "Missing");
-  
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized cron trigger" });
   }
@@ -135,8 +133,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = yesterday.toISOString().split("T")[0];
 
-    // Query real metrics from PostgreSQL for the target date
-    const statsQuery = await pool.query(\`
+    const statsQuery = await pool.query(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
@@ -145,7 +142,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
         COALESCE(ROUND(AVG(latency_ms)), 0) as avg_latency
       FROM scraper_metrics
       WHERE timestamp >= $1::date AND timestamp < ($1::date + INTERVAL '1 day')
-    \`, [dateStr]);
+    `, [dateStr]);
 
     const row = statsQuery.rows[0] || {};
     const metrics = {
@@ -165,7 +162,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
         <li><strong>Total Requests:</strong> ${metrics.totalRequests}</li>
         <li><strong>Successful Scrapes:</strong> ${metrics.successfulScrapes}</li>
         <li><strong>Failed Scrapes:</strong> ${metrics.failedScrapes}</li>
-        <li><strong>Total USDC Revenue:</strong> $\${metrics.revenueUsdc}</li>
+        <li><strong>Total USDC Revenue:</strong> \$${metrics.revenueUsdc}</li>
         <li><strong>Average Latency:</strong> ${metrics.averageLatencyMs}</li>
       </ul>
       <p><em>Service operational since September 1, 2026. Automated report generated via Railway & Resend.</em></p>
@@ -178,7 +175,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
       html: emailHtml,
     });
 
-    return res.status(200).json({ status: "success", resendResponse: data });
+    return res.status(200).json({ status: "success", resendResponse: data, metrics });
   } catch (err) {
     console.error("Failed to send analytics email:", err);
     return res.status(500).json({ status: "error", message: err.message });
