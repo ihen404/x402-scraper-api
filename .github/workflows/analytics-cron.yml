@@ -1,0 +1,17 @@
+name: Daily Analytics Cron
+
+on:
+  schedule:
+    # Runs every day at 7:00 AM EST (12:00 UTC)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  trigger-analytics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit Analytics Endpoint
+        run: |
+          curl -X POST https://x402-scraper-api-production-67a4.up.railway.app/api/internal/send-analytics \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
