@@ -1,6 +1,6 @@
-import express from 'express';
-import puppeteer from 'puppeteer';
-import { Resend } from 'resend';
+import express from "express";
+import puppeteer from "puppeteer";
+import { Resend } from "resend";
 
 const app = express();
 app.use(express.json());
@@ -19,7 +19,7 @@ const PAYMENT_REQUIREMENTS = {
 };
 
 const x402Middleware = async (req, res, next) => {
-  const paymentHeader = req.headers['x-payment'];
+  const paymentHeader = req.headers["x-payment"];
 
   if (!paymentHeader) {
     return res.status(402).json({
@@ -31,8 +31,8 @@ const x402Middleware = async (req, res, next) => {
   }
 
   try {
-    const isMock = paymentHeader.startsWith('mock_');
-    const isValidHash = paymentHeader.startsWith('0x') && paymentHeader.length >= 42;
+    const isMock = paymentHeader.startsWith("mock_");
+    const isValidHash = paymentHeader.startsWith("0x") && paymentHeader.length >= 42;
 
     if (!isMock && !isValidHash) {
       return res.status(402).json({
@@ -55,7 +55,7 @@ const x402Middleware = async (req, res, next) => {
   }
 };
 
-app.post('/api/scrape', x402Middleware, async (req, res) => {
+app.post("/api/scrape", x402Middleware, async (req, res) => {
   const { url, selectors } = req.body;
 
   if (!url) {
@@ -70,11 +70,11 @@ app.post('/api/scrape', x402Middleware, async (req, res) => {
   try {
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
     
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
     
     const title = await page.title();
     
@@ -120,10 +120,9 @@ app.post('/api/scrape', x402Middleware, async (req, res) => {
   }
 });
 
-// Daily Analytics Cron Endpoint with Resend Email Dispatch
-app.post('/api/internal/send-analytics', async (req, res) => {
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === 'production') {
+app.post("/api/internal/send-analytics", async (req, res) => {
+  const secret = req.headers["x-cron-secret"];
+  if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === "production") {
     return res.status(401).json({ error: "Unauthorized cron trigger" });
   }
 
@@ -131,7 +130,7 @@ app.post('/api/internal/send-analytics', async (req, res) => {
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = yesterday.toISOString().split('T')[0];
+    const dateStr = yesterday.toISOString().split("T")[0];
 
     const metrics = {
       date: dateStr,
@@ -150,15 +149,15 @@ app.post('/api/internal/send-analytics', async (req, res) => {
         <li><strong>Total Requests:</strong> ${metrics.totalRequests}</li>
         <li><strong>Successful Scrapes:</strong> ${metrics.successfulScrapes}</li>
         <li><strong>Failed Scrapes:</strong> ${metrics.failedScrapes}</li>
-        <li><strong>Total USDC Revenue:</strong> $${metrics.revenueUsdc}</li>
+        <li><strong>Total USDC Revenue:</strong> $\${metrics.revenueUsdc}</li>
         <li><strong>Average Latency:</strong> ${metrics.averageLatencyMs}</li>
       </ul>
       <p><em>Service operational since September 1, 2026. Automated report generated via Railway & Resend.</em></p>
     `;
 
     const data = await resend.emails.send({
-      from: 'Analytics <onboarding@resend.dev>',
-      to: [process.env.REPORT_RECIPIENT_EMAIL || 'ike@example.com'],
+      from: "Analytics <onboarding@resend.dev>",
+      to: [process.env.REPORT_RECIPIENT_EMAIL || "ike@example.com"],
       subject: `[Analytics] x402-scraper-api Report - ${metrics.date}`,
       html: emailHtml,
     });
