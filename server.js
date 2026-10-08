@@ -1,4 +1,16 @@
 
+import pgPkg from "pg";
+const { Pool } = pgPkg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+});
+
+pool.query(
+  "CREATE TABLE IF NOT EXISTS scraper_metrics (id SERIAL PRIMARY KEY, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status VARCHAR(20), latency_ms INT, revenue_usdc NUMERIC(10,2) DEFAULT 0.00)"
+).catch(err => console.error("DB init error:", err));
+
+
 import pkg from "pg";
 const { Pool } = pkg;
 
