@@ -10,7 +10,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
-// Non-fatal async database initialization
+// Database initialization
 (async () => {
   try {
     await pool.query(`
@@ -53,10 +53,6 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
-});
-
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
