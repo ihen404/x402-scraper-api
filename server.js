@@ -10,6 +10,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
 });
 
+// Non-fatal async database initialization
 (async () => {
   try {
     await pool.query(`
@@ -25,7 +26,7 @@ const pool = new Pool({
   } catch (err) {
     console.error("DB init warning (non-fatal):", err.message);
   }
-})(););
+})();
 
 app.post("/api/internal/run-batch-scrape", async (req, res) => {
   try {
@@ -46,7 +47,7 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
     }
     return res.json({ status: "success", recorded: results.length, details: results });
   } catch (err) {
-    console.error("Batch error:", err);
+    console.error("Batch error detail:", err);
     return res.status(500).json({ error: err.toString(), code: err.code || "UNKNOWN" });
   }
 });
