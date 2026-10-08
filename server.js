@@ -160,7 +160,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
 
     const data = await resend.emails.send({
       from: "Analytics <onboarding@resend.dev>",
-      to: [process.env.REPORT_RECIPIENT_EMAIL || "ike@example.com"],
+      to: [process.env.REPORT_RECIPIENT_EMAIL || "ihentrel@hotmail.com"],
       subject: `[Analytics] x402-scraper-api Report - ${metrics.date}`,
       html: emailHtml,
     });
