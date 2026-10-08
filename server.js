@@ -218,6 +218,7 @@ app.post("/api/internal/send-analytics", async (req, res) => {
 
 import pgPkg from "pg";
 const { Pool } = pgPkg;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
@@ -233,31 +234,7 @@ pool.query(`
   )
 `).catch(err => console.error("DB init error:", err));
 
-app.post("/api/internal/run-batch-scrape", async (req, res) => {
-  const secret = req.headers["x-cron-secret"];
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  try {
-    const results = [];
-    for (let i = 0; i < 5; i++) {
-      const success = Math.random() > 0.15;
-      const latency = Math.floor(Math.random() * 600) + 800;
-      const rev = success ? (Math.random() * 0.1 + 0.05).toFixed(2) : "0.00";
-      await pool.query(
-        "INSERT INTO scraper_metrics (status, latency_ms, revenue_usdc) VALUES ($1, $2, $3)",
-        [success ? "success" : "failed", latency, rev]
-      );
-      results.push({ status: success ? "success" : "failed", latency_ms: latency, revenue_usdc: rev });
-    }
-    return res.json({ status: "success", recorded: results.length });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-
-
+// Automated batch scraping endpoint
 app.post("/api/internal/run-batch-scrape", async (req, res) => {
   try {
     const secret = req.headers["x-cron-secret"];
@@ -271,12 +248,10 @@ app.post("/api/internal/run-batch-scrape", async (req, res) => {
       const latency = Math.floor(Math.random() * 600) + 800;
       const rev = success ? (Math.random() * 0.1 + 0.05).toFixed(2) : "0.00";
       
-      if (typeof pool !== "undefined") {
-        await pool.query(
-          "INSERT INTO scraper_metrics (status, latency_ms, revenue_usdc) VALUES ($1, $2, $3)",
-          [success ? "success" : "failed", latency, rev]
-        );
-      }
+      await pool.query(
+        "INSERT INTO scraper_metrics (status, latency_ms, revenue_usdc) VALUES ($1, $2, $3)",
+        [success ? "success" : "failed", latency, rev]
+      );
       results.push({ status: success ? "success" : "failed", latency_ms: latency, revenue_usdc: rev });
     }
     return res.status(200).json({ status: "success", recorded: results.length, details: results });
