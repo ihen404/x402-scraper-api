@@ -135,13 +135,26 @@ app.post("/api/internal/send-analytics", async (req, res) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = yesterday.toISOString().split("T")[0];
 
+    // Query real metrics from PostgreSQL for the target date
+    const statsQuery = await pool.query(\`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+        COALESCE(SUM(revenue_usdc), 0) as revenue,
+        COALESCE(ROUND(AVG(latency_ms)), 0) as avg_latency
+      FROM scraper_metrics
+      WHERE timestamp >= $1::date AND timestamp < ($1::date + INTERVAL '1 day')
+    \`, [dateStr]);
+
+    const row = statsQuery.rows[0] || {};
     const metrics = {
       date: dateStr,
-      totalRequests: 142,
-      successfulScrapes: 139,
-      failedScrapes: 3,
-      revenueUsdc: "14.20",
-      averageLatencyMs: "1,240 ms"
+      totalRequests: parseInt(row.total || 0, 10),
+      successfulScrapes: parseInt(row.successful || 0, 10),
+      failedScrapes: parseInt(row.failed || 0, 10),
+      revenueUsdc: parseFloat(row.revenue || 0).toFixed(2),
+      averageLatencyMs: `${row.avg_latency || 0} ms`
     };
 
     const emailHtml = `
