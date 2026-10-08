@@ -122,7 +122,10 @@ app.post("/api/scrape", x402Middleware, async (req, res) => {
 
 app.post("/api/internal/send-analytics", async (req, res) => {
   const secret = req.headers["x-cron-secret"];
-  if (secret !== process.env.CRON_SECRET && process.env.NODE_ENV === "production") {
+  
+  console.log("Incoming cron secret attempt:", secret ? "Provided" : "Missing");
+  
+  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized cron trigger" });
   }
 
