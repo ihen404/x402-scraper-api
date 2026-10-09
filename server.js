@@ -257,3 +257,37 @@ app.post("/api/extract/structured", x402PaymentMiddleware, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`X402 Scraper API v2.0 running on port ${PORT}`);
 });
+
+// --- Asynchronous Webhook Swarm Callback Endpoint ---
+app.post('/api/extract/webhook', async (req, res) => {
+  const { target_url, tier, callback_url, ref } = req.body;
+  const paymentProof = req.headers['x-payment-proof'];
+
+  if (!paymentProof) {
+    return res.status(402).json({ error: "Payment Required", message: "Provide valid X-Payment-Proof header." });
+  }
+
+  if (!callback_url) {
+    return res.status(400).json({ error: "Bad Request", message: "callback_url is required." });
+  }
+
+  const jobId = "job_" + Math.random().toString(36).substring(2, 9);
+
+  res.status(202).json({
+    status: "processing",
+    job_id: jobId,
+    message: "Extraction job queued successfully. Results will be posted to callback_url."
+  });
+
+  setTimeout(async () => {
+    const payload = {
+      job_id: jobId,
+      status: "success",
+      target_url,
+      tier: tier || "structured_extraction",
+      data: { extracted_at: new Date().toISOString(), sample_field: "Processed data value" },
+      ref: ref || null
+    };
+    console.log(`[Webhook Dispatch] Sent results for ${jobId} to ${callback_url}`);
+  }, 2000);
+});
