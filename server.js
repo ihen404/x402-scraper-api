@@ -1,6 +1,32 @@
 import express from "express";
 
 const app = express();
+
+// Explicit Agent.json and OpenAPI endpoints
+app.get("/.well-known/agent.json", (req, res) => {
+  res.json({
+    schema_version: "v1",
+    name: "X402 Autonomous Scraper API",
+    description: "High-speed, LLM-optimized web scraping utility designed for autonomous agents and bots with instant HTTP 402 micro-settlements.",
+    auth_type: "x402",
+    pricing: { currency: "USDC", network: "base", cost_per_request: "0.01" },
+    endpoints: {
+      scrape: "https://x402-scraper-api-production-67a4.up.railway.app/api/scrape",
+      batch_scrape: "https://x402-scraper-api-production-67a4.up.railway.app/api/internal/run-batch-scrape",
+      analytics: "https://x402-scraper-api-production-67a4.up.railway.app/api/internal/analytics"
+    },
+    openapi: "https://x402-scraper-api-production-67a4.up.railway.app/openapi.json"
+  });
+});
+
+app.get("/openapi.json", (req, res) => {
+  res.json({
+    openapi: "3.0.1",
+    info: { title: "X402 Scraper API", version: "1.0.0", description: "Programmatic web scraping API for autonomous agents." },
+    servers: [{ url: "https://x402-scraper-api-production-67a4.up.railway.app" }]
+  });
+});
+
 app.use(express.json());
 
 // In-memory fallback store for metrics
