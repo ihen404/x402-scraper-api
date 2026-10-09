@@ -75,7 +75,7 @@ app.post("/api/internal/send-daily-report", async (req, res) => {
 
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "onboarding@resend.dev",
-      to: process.env.REPORT_RECIPIENT || "ihentrel@gmail.com",
+      to: process.env.REPORT_RECIPIENT || "ihentrel@hotmail.com",
       subject: "Daily Analytics Report - Scraper Metrics",
       html: `
         <h2>Daily Analytics Report</h2>
