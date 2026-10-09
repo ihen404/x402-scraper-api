@@ -100,3 +100,68 @@ app.post("/api/internal/send-daily-report", async (req, res) => {
     return res.status(500).json({ error: err.toString() });
   }
 });
+
+
+// --- Machine-Readable Agent & OpenAPI Manifests ---
+
+// 1. Agent.json manifest for autonomous agent discovery
+app.get("/.well-known/agent.json", (req, res) => {
+  res.json({
+    schema_version: "v1",
+    name: "X402 Autonomous Scraper API",
+    description: "High-speed, LLM-optimized web scraping utility designed for autonomous agents and bots with instant HTTP 402 micro-settlements.",
+    auth_type: "x402",
+    pricing: {
+      currency: "USDC",
+      network: "base",
+      cost_per_request: "0.01"
+    },
+    endpoints: {
+      scrape: "https://x402-scraper-api-production-67a4.up.railway.app/api/scrape",
+      batch_scrape: "https://x402-scraper-api-production-67a4.up.railway.app/api/internal/run-batch-scrape",
+      analytics: "https://x402-scraper-api-production-67a4.up.railway.app/api/internal/analytics"
+    },
+    openapi: "https://x402-scraper-api-production-67a4.up.railway.app/openapi.json"
+  });
+});
+
+// 2. OpenAPI 3.0 specification for tool-calling LLMs and agent frameworks
+app.get("/openapi.json", (req, res) => {
+  res.json({
+    openapi: "3.0.1",
+    info: {
+      title: "X402 Scraper API",
+      version: "1.0.0",
+      description: "Programmatic web scraping API for autonomous agents requiring clean JSON payloads."
+    },
+    servers: [
+      { url: "https://x402-scraper-api-production-67a4.up.railway.app" }
+    ],
+    paths: {
+      "/api/scrape": {
+        post: {
+          summary: "Execute a web scrape",
+          description: "Returns clean JSON extracted from target URL. Requires x402 micro-payment header.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    url: { type: "string", description: "Target URL to scrape" }
+                  },
+                  required: ["url"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Successful extraction (JSON payload)" },
+            "402": { description: "Payment Required - returns x402 payment details in headers" }
+          }
+        }
+      }
+    }
+  });
+});
