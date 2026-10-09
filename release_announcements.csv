@@ -1,0 +1,19 @@
+Platform,Status,Title / Headline,Content / Copy,Tags / Keywords
+Dev.to,Draft,"Building Machine-Payable APIs: Introducing x402 Web Scraper on Base","AI agents need clean web data, but traditional subscriptions create friction. Introducing x402 Scraper API—a web extraction service built around the HTTP 402 Payment Required status code.
+
+### How It Works
+1. Send POST request to API endpoint.
+2. Receive 402 Payment Required with payment requirements (0.005 USDC on Base).
+3. Settle transaction on-chain and retry request with transaction proof header.
+
+Built with Node.js, Express, and x402-express on Base.","webdev, node, crypto, express"
+X (Twitter),Draft,"🚀 Live on Base: x402 Web Scraper API","No API keys. No monthly plans. Pay per call via HTTP 402.
+
+• Price: 0.005 USDC / call
+• Settlement: Base Mainnet
+• Features: Title, clean headers & main text previews for AI agents
+
+Try it:
+curl -i -X POST https://x402-scraper-api-production-67a4.up.railway.app/api/scrape \
+  -H ""Content-Type: application/json"" \
+  -d '{\""url\"":\""https://news.ycombinator.com\""}'","Base, x402, BuildOnBase, MCP, WebScraping"

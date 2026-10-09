@@ -1,4 +1,7 @@
-node_modules
+node_modules/
 .env
+.DS_Store
+.mcpregistry_github_token
+.mcpregistry_registry_token
 .npmrc
 x402-scraper-client/.npmrc
