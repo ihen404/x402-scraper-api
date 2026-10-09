@@ -191,3 +191,40 @@ app.get("/openapi.json", (req, res) => {
     }
   });
 });
+
+
+// --- Public Scraper Endpoint for Autonomous Agents ---
+app.post("/api/scrape", x402PaymentMiddleware, async (req, res) => {
+  const startTime = Date.now();
+  const { url } = req.body;
+  
+  if (!url) {
+    return res.status(400).json({ error: "Missing required url parameter" });
+  }
+
+  try {
+    // Simulated or actual scrape logic here
+    const latency = Date.now() - startTime;
+    const record = { 
+      id: metricsStore.length + 1, 
+      timestamp: new Date().toISOString(), 
+      target_url: url,
+      status: "success", 
+      latency_ms: latency, 
+      revenue_usDC: "0.01" 
+    };
+    metricsStore.push(record);
+    
+    return res.json({ 
+      status: "success", 
+      data: { 
+        url, 
+        title: "Scraped Content Example", 
+        content: "LLM-optimized JSON extraction payload." 
+      }, 
+      metrics: record 
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.toString() });
+  }
+});
