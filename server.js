@@ -137,7 +137,7 @@ app.post("/api/scrape/async", x402PaymentMiddleware, async (req, res) => {
     return res.status(400).json({ error: "Missing required url parameter" });
   }
 
-  const jobId = "job_" + Math.random().toString(36.substring(2, 9));
+  const jobId = "job_" + Math.random().toString(36).substring(2, 9);
   const tier = render_js ? "headless_js_render" : "static_html";
   const revenue = render_js ? "0.03" : "0.01";
 
