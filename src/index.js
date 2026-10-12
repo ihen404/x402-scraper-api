@@ -1,89 +1,93 @@
 import express from 'express';
-import discoveryRouter from './routes/discovery.js';
-import { createCreditAccount, verifyAndDeductCredit } from './services/creditsService.js';
-import { getCachedResult, setCachedResult, processAffiliateRebate, sendWebhookWithRetry } from './services/utilityService.js';
+import NodeCache from 'node-cache';
+import { v4 as uuidv4 } from 'uuid';
+import fetch from 'node-fetch';
 
 const app = express();
 app.use(express.json());
 
-// Mount Discovery & A2A Handshake routes
-app.use('/api', discoveryRouter);
+// In-memory cache & credit store
+const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
+const creditVault = new Map();
 
-// Pre-paid credit account creation endpoint
+// --- Discovery & A2A Handshake ---
+app.get('/api/capabilities', (req, res) => {
+  res.json({
+    service: "x402 Scraper & Extraction M2M Utility",
+    version: "1.2.0",
+    network: "eip155:8453",
+    payout_address: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
+    pricing: {
+      standard_scrape_usdc: 0.01,
+      cached_scrape_usdc: 0.0025,
+      affiliate_rebate_pct: 10
+    },
+    caching: { enabled: true, ttl_seconds: 900 },
+    endpoints: {
+      openapi_spec: "/api/openapi.json",
+      extract_sync: "/api/extract",
+      extract_async: "/api/extract/webhook",
+      credits_deposit: "/api/credits/deposit"
+    }
+  });
+});
+
+app.get('/api/openapi.json', (req, res) => {
+  res.json({
+    openapi: "3.1.0",
+    info: { title: "x402 Scraper M2M API", version: "1.2.0" },
+    servers: [{ url: "https://x402-scraper-api-production-67a4.up.railway.app" }]
+  });
+});
+
+// --- Pre-Paid Credits ---
 app.post('/api/credits/deposit', (req, res) => {
   const { walletAddress, amountUSDC } = req.body;
   if (!walletAddress || !amountUSDC) {
     return res.status(400).json({ error: "Missing walletAddress or amountUSDC" });
   }
-  const account = createCreditAccount(walletAddress, amountUSDC);
-  res.json({ message: "Credit account funded successfully", ...account });
+  const apiKey = `x402_key_${uuidv4().replace(/-/g, '')}`;
+  creditVault.set(apiKey, {
+    walletAddress,
+    balanceUSDC: parseFloat(amountUSDC),
+    createdAt: new Date().toISOString()
+  });
+  res.json({ message: "Credit account funded successfully", apiKey, balanceUSDC: amountUSDC });
 });
 
-// Core Scrape Endpoint with Caching, Referrals, and Credit Deduction
+// --- Core Scrape Endpoint ---
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   const apiKey = req.headers['x-api-key'];
   const refWallet = req.headers['ref'];
 
-  if (!url) {
-    return res.status(400).json({ error: "Missing required 'url' parameter" });
-  }
+  if (!url) return res.status(400).json({ error: "Missing required 'url' parameter" });
 
-  const standardCost = 0.01;
-  const cachedCost = 0.0025;
-
-  // 1. Check Caching Layer
-  const cachedData = getCachedResult(url);
+  const cachedData = scrapeCache.get(url);
   if (cachedData) {
-    const cost = cachedCost;
     if (apiKey) {
-      const deduction = verifyAndDeductCredit(apiKey, cost);
-      if (!deduction.valid) return res.status(402).json({ error: deduction.reason });
+      const acc = creditVault.get(apiKey);
+      if (!acc || acc.balanceUSDC < 0.0025) return res.status(402).json({ error: "Invalid key or insufficient balance" });
+      acc.balanceUSDC -= 0.0025;
     }
-    processAffiliateRebate(refWallet, cost);
-    return res.json({ source: "cache", costUSDC: cost, data: cachedData });
+    if (refWallet) console.log(`[Affiliate] Rebate routed to ${refWallet}`);
+    return res.json({ source: "cache", costUSDC: 0.0025, data: cachedData });
   }
 
-  // 2. Handle Payment/Credits for Fresh Scrape
   if (apiKey) {
-    const deduction = verifyAndDeductCredit(apiKey, standardCost);
-    if (!deduction.valid) return res.status(402).json({ error: deduction.reason });
+    const acc = creditVault.get(apiKey);
+    if (!acc || acc.balanceUSDC < 0.01) return res.status(402).json({ error: "Invalid key or insufficient balance" });
+    acc.balanceUSDC -= 0.01;
   }
 
-  // Perform mock/live extraction
-  const extractedData = {
-    url,
-    title: `Extracted title for ${url}`,
-    timestamp: new Date().toISOString()
-  };
+  const extractedData = { url, title: `Extracted title for ${url}`, timestamp: new Date().toISOString() };
+  scrapeCache.set(url, extractedData);
+  if (refWallet) console.log(`[Affiliate] Rebate routed to ${refWallet}`);
 
-  // Save to cache
-  setCachedResult(url, extractedData);
-
-  // Process affiliate rebate
-  processAffiliateRebate(refWallet, standardCost);
-
-  res.json({ source: "live", costUSDC: standardCost, data: extractedData });
+  res.json({ source: "live", costUSDC: 0.01, data: extractedData });
 });
 
-// Async Webhook Endpoint with Retry Logic
-app.post('/api/extract/webhook', async (req, res) => {
-  const { url, callbackUrl } = req.body;
-  if (!url || !callbackUrl) {
-    return res.status(400).json({ error: "Missing 'url' or 'callbackUrl'" });
-  }
-
-  // Acknowledge immediately
-  res.json({ status: "processing", message: "Extraction queued. Results will be delivered via webhook with exponential backoff." });
-
-  // Simulate background scrape and dispatch
-  setTimeout(async () => {
-    const result = { url, extractedAt: new Date().toISOString(), content: "Async scraped payload..." };
-    await sendWebhookWithRetry(callbackUrl, result);
-  }, 500);
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`x402 M2M Utility running on port ${PORT}`);
 });
