@@ -8,7 +8,7 @@ app.use(express.json());
 const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 const creditVault = new Map();
 
-// --- Root & Health Check ---
+// --- Root Status Route ---
 app.get('/', (req, res) => {
   res.json({ status: "online", service: "x402-scraper-api", version: "1.2.0" });
 });
@@ -34,7 +34,7 @@ app.post('/api/credits/deposit', (req, res) => {
   res.json({ message: "Deposit success", apiKey, balanceUSDC: amountUSDC });
 });
 
-// --- Extract Endpoint ---
+// --- Core Scrape Endpoint ---
 app.post('/api/extract', (req, res) => {
   const { url } = req.body;
   const apiKey = req.headers['x-api-key'];
@@ -65,12 +65,12 @@ app.post('/api/extract', (req, res) => {
   res.json({ source: "live", costUSDC: 0.01, data: extractedData });
 });
 
-// Catch-all route to prevent standard Express HTML 404s
+// --- Catch-all Fallback ---
 app.use('*', (req, res) => {
   res.status(404).json({ error: "Route not found", path: req.originalUrl });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = parseInt(process.env.PORT, 10) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`x402 Scraper API running on 0.0.0.0:${PORT}`);
 });
