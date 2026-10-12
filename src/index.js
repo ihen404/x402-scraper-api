@@ -26,13 +26,14 @@ function loadData() {
         vault: new Map(Object.entries(parsed.vault || {})),
         txs: new Set(parsed.txs || []),
         affiliates: parsed.affiliates || [],
-        usageLogs: parsed.usageLogs || []
+        usageLogs: parsed.usageLogs || [],
+        bounties: parsed.bounties || []
       };
     } catch (e) {
       console.error("Error loading data file:", e);
     }
   }
-  return { vault: new Map(), txs: new Set(), affiliates: [], usageLogs: [] };
+  return { vault: new Map(), txs: new Set(), affiliates: [], usageLogs: [], bounties: [] };
 }
 
 function saveData() {
@@ -41,7 +42,8 @@ function saveData() {
       vault: Object.fromEntries(db.vault),
       txs: Array.from(db.txs),
       affiliates: db.affiliates,
-      usageLogs: db.usageLogs
+      usageLogs: db.usageLogs,
+      bounties: db.bounties
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2));
   } catch (e) {
@@ -53,20 +55,28 @@ const db = loadData();
 const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 const PAYOUT_ADDRESS = "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28";
 
-// --- Core Scraping Logic Function ---
+// --- Core Scraping & Sanitization Engine ---
 async function executeScrape(url, apiKey, format, refWallet) {
   const account = db.vault.get(apiKey);
   if (!account) throw new Error("Unauthorized or invalid API Key");
 
-  // Calculate volume calls for this key to determine Volume Tier
   const keyUsageCount = (account.totalCalls || 0) + 1;
   account.totalCalls = keyUsageCount;
 
   const isTier2Volume = keyUsageCount > 1000;
   const standardRate = isTier2Volume ? 0.008 : 0.01;
 
+  // Pricing matrix: Sanitized format carries premium security guardrail cost ($0.015)
+  const isSanitized = format === 'sanitized';
   const cachedData = scrapeCache.get(url);
-  const cost = cachedData ? 0.0025 : standardRate;
+  
+  let cost = standardRate;
+  if (cachedData) {
+    cost = 0.0025;
+  } else if (isSanitized) {
+    cost = 0.015;
+  }
+
   const isCacheHit = !!cachedData;
 
   if (account.balanceUSDC < cost) {
@@ -86,14 +96,23 @@ async function executeScrape(url, apiKey, format, refWallet) {
 
       const title = $('title').text().trim() || null;
       const description = $('meta[name="description"]').attr('content') || null;
-      const textSnippet = $('p').first().text().trim() || "";
+      let textSnippet = $('p').first().text().trim() || "";
+
+      // Prompt injection neutralization guardrail for sanitized format
+      if (isSanitized) {
+        textSnippet = textSnippet
+          .replace(/ignore previous instructions/gi, "[NEUTRALIZED_INJECTION_ATTEMPT]")
+          .replace(/system prompt/gi, "[NEUTRALIZED_KEYWORD]")
+          .replace(/you are now/gi, "[NEUTRALIZED_OVERRIDE]");
+      }
 
       let extracted;
-      if (format === 'markdown') {
+      if (format === 'markdown' || isSanitized) {
         const headingsList = $('h1, h2').map((_, el) => `## ${$(el).text().trim()}`).get().join('\n\n');
         extracted = {
           url,
-          format: 'markdown',
+          format: isSanitized ? 'sanitized-markdown' : 'markdown',
+          securityGuardrail: isSanitized ? "active-sanitized" : "standard",
           content: `# ${title}\n\n> ${description || ''}\n\n${headingsList}\n\n${textSnippet}`,
           timestamp: new Date().toISOString()
         };
@@ -118,11 +137,9 @@ async function executeScrape(url, apiKey, format, refWallet) {
     }
   }
 
-  // Calculate savings/discounts relative to baseline $0.01 live call
   const baselineCost = 0.01;
   const clientSavings = baselineCost - cost;
 
-  // Log usage record for Daily Analytics reporting
   db.usageLogs.push({
     apiKey,
     costUSDC: cost,
@@ -181,13 +198,41 @@ async function runGrowthScoutTask() {
 function startAutonomousGrowthScout() {
   runGrowthScoutTask().catch(err => console.error("[Growth Scout Worker] Error:", err));
   setInterval(() => {
-    runGrowthScoutTask().catch(err => console.error("[Growth Scout Worker] Error:", err));
+    runGrowthScoutTask().catch(err => console.error(" Growth Scout Worker] Error:", err));
   }, 21600000);
 }
 
 // --- Express API Routes ---
 app.get('/', (req, res) => {
   res.json({ status: "online", service: "x402-scraper-api", version: "3.2.0-agentic", scout: "active_24_7" });
+});
+
+// Standard Agent Discovery Manifests
+app.get('/.well-known/mcp.json', (req, res) => {
+  res.json({
+    name: "x402-scraper-api",
+    version: "3.2.0",
+    description: "Autonomous M2M HTTP 402 scraper, prompt-sanitized RAG extractor, and bounty escrow utility.",
+    transport: "http-sse-mcp",
+    endpoints: {
+      extract: "https://x402-scraper-api-production-67a4.up.railway.app/api/extract",
+      deposit: "https://x402-scraper-api-production-67a4.up.railway.app/api/credits/deposit",
+      transfer: "https://x402-scraper-api-production-67a4.up.railway.app/api/credits/transfer",
+      bounties: "https://x402-scraper-api-production-67a4.up.railway.app/api/bounties"
+    },
+    payoutAddress: PAYOUT_ADDRESS
+  });
+});
+
+app.get('/.well-known/ai-plugin.json', (req, res) => {
+  res.json({
+    schema_version: "v1",
+    name_for_human: "x402 Autonomous Web Scraper",
+    name_for_model: "x402_scraper_utility",
+    description_for_model: "Secure M2M web scraper with prompt injection sanitization, HTTP 402 Base settlement, and agent credit transfers.",
+    auth: { type: "api_key", defining_request_header: "X-Api-Key" },
+    api: { type: "openapi", url: "https://x402-scraper-api-production-67a4.up.railway.app/api/capabilities" }
+  });
 });
 
 app.get('/api/capabilities', (req, res) => {
@@ -199,20 +244,25 @@ app.get('/api/capabilities', (req, res) => {
     pricing: {
       standard_tier1_usdc: 0.01,
       volume_tier2_usdc: 0.008,
+      sanitized_secure_usdc: 0.015,
       cached_scrape_usdc: 0.0025,
       affiliate_rebate_pct: 10
     },
-    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Server-Enabled", "Daily-Tier-Analytics"]
+    features: [
+      "HTTP-402-Negotiation",
+      "Prompt-Sanitization-Guardrails",
+      "Micro-Bounty-Escrow",
+      "Agent-to-Agent-Credit-Transfer",
+      "MCP-Auto-Discovery"
+    ]
   });
 });
 
 // Daily Analytics & Tier Breakdown Endpoint
 app.get('/api/analytics/daily', (req, res) => {
   const logs = db.usageLogs || [];
-  
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-
   const recentLogs = logs.filter(l => new Date(l.timestamp) >= oneDayAgo);
 
   let tier1Calls = 0;
@@ -225,10 +275,8 @@ app.get('/api/analytics/daily', (req, res) => {
   for (const log of recentLogs) {
     totalRevenueUSDC += log.costUSDC;
     totalClientDiscountUSDC += log.savingsUSDC;
-
     if (log.isCacheHit) cacheHits++;
     else liveScrapes++;
-
     if (log.tier.includes("Tier 2")) tier2Calls++;
     else tier1Calls++;
   }
@@ -246,15 +294,11 @@ app.get('/api/analytics/daily', (req, res) => {
       tier2_volume_calls: tier2Calls,
       cache_hit_calls: cacheHits,
       live_scrape_calls: liveScrapes
-    },
-    pricingStructure: {
-      tier1_standard_rate: "$0.01",
-      tier2_volume_rate: "$0.008 (Calls > 1,000)",
-      cache_discount_rate: "$0.0025 (Save $0.0075/call)"
     }
   });
 });
 
+// Affiliate Ledger Stats Query Endpoint
 app.get('/api/affiliates/stats', (req, res) => {
   const { wallet } = req.query;
   if (!wallet) return res.status(400).json({ error: "Missing required 'wallet' parameter" });
@@ -270,6 +314,77 @@ app.get('/api/affiliates/stats', (req, res) => {
   });
 });
 
+// Agent-to-Agent Credit Transfer Endpoint
+app.post('/api/credits/transfer', (req, res) => {
+  const senderApiKey = req.headers['x-api-key'];
+  const { recipientApiKey, amountUSDC } = req.body;
+
+  if (!senderApiKey || !recipientApiKey || !amountUSDC) {
+    return res.status(400).json({ error: "Missing required headers (X-Api-Key) or body parameters (recipientApiKey, amountUSDC)" });
+  }
+
+  const sender = db.vault.get(senderApiKey);
+  const recipient = db.vault.get(recipientApiKey);
+
+  if (!sender) return res.status(401).json({ error: "Invalid sender API Key" });
+  if (!recipient) return res.status(400).json({ error: "Invalid recipient API Key" });
+
+  const transferAmount = parseFloat(amountUSDC);
+  if (sender.balanceUSDC < transferAmount) {
+    return res.status(400).json({ error: `Insufficient balance. Sender balance: ${sender.balanceUSDC}` });
+  }
+
+  sender.balanceUSDC -= transferAmount;
+  recipient.balanceUSDC += transferAmount;
+  saveData();
+
+  res.json({
+    message: "Credit transfer successful",
+    transferredUSDC: transferAmount,
+    senderRemainingBalance: sender.balanceUSDC,
+    recipientNewBalance: recipient.balanceUSDC,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Micro-Bounty Escrow Endpoints
+app.post('/api/bounties', (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  const { targetUrl, rewardUSDC } = req.body;
+
+  if (!apiKey) return res.status(401).json({ error: "API Key required to post bounty" });
+  if (!targetUrl || !rewardUSDC) return res.status(400).json({ error: "Missing targetUrl or rewardUSDC" });
+
+  const account = db.vault.get(apiKey);
+  const bountyAmount = parseFloat(rewardUSDC);
+
+  if (account.balanceUSDC < bountyAmount) {
+    return res.status(400).json({ error: "Insufficient balance to escrow bounty reward" });
+  }
+
+  account.balanceUSDC -= bountyAmount;
+
+  const bountyId = `bounty_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
+  const bounty = {
+    bountyId,
+    posterApiKey: apiKey,
+    targetUrl,
+    rewardUSDC: bountyAmount,
+    status: "open",
+    createdAt: new Date().toISOString()
+  };
+
+  db.bounties.push(bounty);
+  saveData();
+
+  res.json({ message: "Bounty escrowed successfully", bountyId, status: "open", escrowedUSDC: bountyAmount });
+});
+
+app.get('/api/bounties', (req, res) => {
+  res.json({ activeBounties: db.bounties.filter(b => b.status === 'open') });
+});
+
+// Deposit Endpoint
 app.post('/api/credits/deposit', async (req, res) => {
   const { walletAddress, txHash, amountUSDC } = req.body;
   const isTestMode = req.headers['x-test-mode'] === 'true' || txHash?.startsWith('0xTEST');
@@ -309,6 +424,7 @@ app.post('/api/credits/deposit', async (req, res) => {
   res.json({ message: "Deposit verified and credited successfully", apiKey, balanceUSDC: account.balanceUSDC, testMode: isTestMode });
 });
 
+// Extract & Scrape Endpoint
 app.post('/api/extract', async (req, res) => {
   const { url, webhookUrl, format } = req.body;
   const apiKey = req.headers['x-api-key'];
