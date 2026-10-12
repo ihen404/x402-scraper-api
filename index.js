@@ -132,6 +132,22 @@ app.get('/api/capabilities', (req, res) => {
   });
 });
 
+// Affiliate Ledger Stats Query Endpoint
+app.get('/api/affiliates/stats', (req, res) => {
+  const { wallet } = req.query;
+  if (!wallet) return res.status(400).json({ error: "Missing required 'wallet' parameter" });
+
+  const records = db.affiliates.filter(r => r.referrerWallet.toLowerCase() === wallet.toLowerCase());
+  const totalEarnedUSDC = records.reduce((acc, r) => acc + r.rebateUSDC, 0);
+
+  res.json({
+    referrerWallet: wallet,
+    totalRebateUSDC: totalEarnedUSDC,
+    totalTransactions: records.length,
+    history: records.slice(-20)
+  });
+});
+
 app.post('/api/credits/deposit', async (req, res) => {
   const { walletAddress, txHash, amountUSDC } = req.body;
   const isTestMode = req.headers['x-test-mode'] === 'true' || txHash?.startsWith('0xTEST');
@@ -212,56 +228,7 @@ app.post('/api/extract', async (req, res) => {
   }
 });
 
-// --- Model Context Protocol (MCP) Server Setup ---
-if (process.env.MCP_MODE === 'true') {
-  const mcpServer = new Server({
-    name: "x402-scraper-mcp",
-    version: "3.2.0"
-  }, {
-    capabilities: { tools: {} }
-  });
-
-  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      {
-        name: "extract_web_content",
-        description: "Scrapes a URL and extracts token-optimized structured JSON or Markdown data for RAG pipelines via the x402 M2M network.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "The target URL to scrape" },
-            apiKey: { type: "string", description: "Your x402 API key" },
-            format: { type: "string", enum: ["json", "markdown"], description: "Output format (default json)" }
-          },
-          required: ["url", "apiKey"]
-        }
-      }
-    ]
-  }));
-
-  mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-    if (request.params.name === "extract_web_content") {
-      const { url, apiKey, format } = request.params.arguments;
-      try {
-        const result = await executeScrape(url, apiKey, format, PAYOUT_ADDRESS);
-        return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
-        };
-      } catch (err) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
-          isError: true
-        };
-      }
-    }
-    throw new Error(`Unknown tool: ${request.params.name}`);
-  });
-
-  const transport = new StdioServerTransport();
-  mcpServer.connect(transport).catch(err => console.error("MCP Server Error:", err));
-} else {
-  const PORT = parseInt(process.env.PORT, 10) || 8080;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`x402 Scraper API v3.2 running on 0.0.0.0:${PORT}`);
-  });
-}
+const PORT = parseInt(process.env.PORT, 10) || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`x402 Scraper API v3.2 running on 0.0.0.0:${PORT}`);
+});
