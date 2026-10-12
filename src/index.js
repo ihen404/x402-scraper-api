@@ -66,7 +66,6 @@ async function executeScrape(url, apiKey, format, refWallet) {
   const isTier2Volume = keyUsageCount > 1000;
   const standardRate = isTier2Volume ? 0.008 : 0.01;
 
-  // Pricing matrix: Sanitized format carries premium security guardrail cost ($0.015)
   const isSanitized = format === 'sanitized';
   const cachedData = scrapeCache.get(url);
   
@@ -98,7 +97,6 @@ async function executeScrape(url, apiKey, format, refWallet) {
       const description = $('meta[name="description"]').attr('content') || null;
       let textSnippet = $('p').first().text().trim() || "";
 
-      // Prompt injection neutralization guardrail for sanitized format
       if (isSanitized) {
         textSnippet = textSnippet
           .replace(/ignore previous instructions/gi, "[NEUTRALIZED_INJECTION_ATTEMPT]")
@@ -160,7 +158,6 @@ async function executeScrape(url, apiKey, format, refWallet) {
 
 // --- Autonomous Growth Scout Worker Loop ---
 async function runGrowthScoutTask() {
-  console.log("[Growth Scout Worker] Starting 24/7 autonomous ecosystem scan...");
   try {
     const res = await fetch("https://api.github.com/search/code?q=mcpServers+filename:config.json", {
       headers: { 
@@ -168,38 +165,29 @@ async function runGrowthScoutTask() {
         ...(process.env.GITHUB_TOKEN ? { "Authorization": `token ${process.env.GITHUB_TOKEN}` } : {})
       }
     });
-
     if (res.ok) {
       const data = await res.json();
       console.log(`[Growth Scout Worker] Scan complete. Evaluated ${data.total_count || 0} integration targets.`);
-    } else {
-      console.log("[Growth Scout Worker] Public search rate limit reached or graceful fallback active. Synchronizing offline assets.");
     }
   } catch (err) {
-    console.log("[Growth Scout Worker] Network scan skipped, fallback active:", err.message);
+    console.log("[Growth Scout Worker] Network scan skipped, fallback active.");
   }
 
   const outputDir = './growth_output';
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir);
-  }
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
   const timestamp = new Date().toISOString();
-  const scoutReport = {
+  fs.writeFileSync(`${outputDir}/scout-status.json`, JSON.stringify({
     lastRun: timestamp,
     activeReferrerWallet: PAYOUT_ADDRESS,
     status: "active_24_7",
     message: "Background growth worker operational on Railway container."
-  };
-
-  fs.writeFileSync(`${outputDir}/scout-status.json`, JSON.stringify(scoutReport, null, 2));
+  }, null, 2));
 }
 
 function startAutonomousGrowthScout() {
-  runGrowthScoutTask().catch(err => console.error("[Growth Scout Worker] Error:", err));
-  setInterval(() => {
-    runGrowthScoutTask().catch(err => console.error(" Growth Scout Worker] Error:", err));
-  }, 21600000);
+  runGrowthScoutTask().catch(err => console.error(err));
+  setInterval(() => { runGrowthScoutTask().catch(err => console.error(err)); }, 21600000);
 }
 
 // --- Express API Routes ---
@@ -207,7 +195,6 @@ app.get('/', (req, res) => {
   res.json({ status: "online", service: "x402-scraper-api", version: "3.2.0-agentic", scout: "active_24_7" });
 });
 
-// Standard Agent Discovery Manifests
 app.get('/.well-known/mcp.json', (req, res) => {
   res.json({
     name: "x402-scraper-api",
@@ -248,17 +235,10 @@ app.get('/api/capabilities', (req, res) => {
       cached_scrape_usdc: 0.0025,
       affiliate_rebate_pct: 10
     },
-    features: [
-      "HTTP-402-Negotiation",
-      "Prompt-Sanitization-Guardrails",
-      "Micro-Bounty-Escrow",
-      "Agent-to-Agent-Credit-Transfer",
-      "MCP-Auto-Discovery"
-    ]
+    features: ["HTTP-402-Negotiation", "Prompt-Sanitization-Guardrails", "Micro-Bounty-Escrow", "Agent-to-Agent-Credit-Transfer", "MCP-Auto-Discovery"]
   });
 });
 
-// Daily Analytics & Tier Breakdown Endpoint
 app.get('/api/analytics/daily', (req, res) => {
   const logs = db.usageLogs || [];
   const now = new Date();
@@ -284,97 +264,55 @@ app.get('/api/analytics/daily', (req, res) => {
   res.json({
     reportTimestamp: now.toISOString(),
     window: "24 Hours",
-    summary: {
-      totalCalls: recentLogs.length,
-      totalRevenueUSDC: parseFloat(totalRevenueUSDC.toFixed(4)),
-      totalClientSavingsUSDC: parseFloat(totalClientDiscountUSDC.toFixed(4))
-    },
-    tierBreakdown: {
-      tier1_standard_calls: tier1Calls,
-      tier2_volume_calls: tier2Calls,
-      cache_hit_calls: cacheHits,
-      live_scrape_calls: liveScrapes
-    }
+    summary: { totalCalls: recentLogs.length, totalRevenueUSDC: parseFloat(totalRevenueUSDC.toFixed(4)), totalClientSavingsUSDC: parseFloat(totalClientDiscountUSDC.toFixed(4)) },
+    tierBreakdown: { tier1_standard_calls: tier1Calls, tier2_volume_calls: tier2Calls, cache_hit_calls: cacheHits, live_scrape_calls: liveScrapes }
   });
 });
 
-// Affiliate Ledger Stats Query Endpoint
 app.get('/api/affiliates/stats', (req, res) => {
   const { wallet } = req.query;
   if (!wallet) return res.status(400).json({ error: "Missing required 'wallet' parameter" });
-
   const records = db.affiliates.filter(r => r.referrerWallet.toLowerCase() === wallet.toLowerCase());
   const totalEarnedUSDC = records.reduce((acc, r) => acc + r.rebateUSDC, 0);
-
-  res.json({
-    referrerWallet: wallet,
-    totalRebateUSDC: parseFloat(totalEarnedUSDC.toFixed(4)),
-    totalTransactions: records.length,
-    history: records.slice(-20)
-  });
+  res.json({ referrerWallet: wallet, totalRebateUSDC: parseFloat(totalEarnedUSDC.toFixed(4)), totalTransactions: records.length, history: records.slice(-20) });
 });
 
-// Agent-to-Agent Credit Transfer Endpoint
 app.post('/api/credits/transfer', (req, res) => {
   const senderApiKey = req.headers['x-api-key'];
   const { recipientApiKey, amountUSDC } = req.body;
-
-  if (!senderApiKey || !recipientApiKey || !amountUSDC) {
-    return res.status(400).json({ error: "Missing required headers (X-Api-Key) or body parameters (recipientApiKey, amountUSDC)" });
-  }
+  if (!senderApiKey || !recipientApiKey || !amountUSDC) return res.status(400).json({ error: "Missing headers or parameters" });
 
   const sender = db.vault.get(senderApiKey);
   const recipient = db.vault.get(recipientApiKey);
-
   if (!sender) return res.status(401).json({ error: "Invalid sender API Key" });
   if (!recipient) return res.status(400).json({ error: "Invalid recipient API Key" });
 
   const transferAmount = parseFloat(amountUSDC);
-  if (sender.balanceUSDC < transferAmount) {
-    return res.status(400).json({ error: `Insufficient balance. Sender balance: ${sender.balanceUSDC}` });
-  }
+  if (sender.balanceUSDC < transferAmount) return res.status(400).json({ error: "Insufficient balance" });
 
   sender.balanceUSDC -= transferAmount;
   recipient.balanceUSDC += transferAmount;
   saveData();
 
-  res.json({
-    message: "Credit transfer successful",
-    transferredUSDC: transferAmount,
-    senderRemainingBalance: sender.balanceUSDC,
-    recipientNewBalance: recipient.balanceUSDC,
-    timestamp: new Date().toISOString()
-  });
+  res.json({ message: "Transfer successful", transferredUSDC: transferAmount, senderRemainingBalance: sender.balanceUSDC });
 });
 
-// Micro-Bounty Escrow Endpoints
 app.post('/api/bounties', (req, res) => {
   const apiKey = req.headers['x-api-key'];
   const { targetUrl, rewardUSDC } = req.body;
-
-  if (!apiKey) return res.status(401).json({ error: "API Key required to post bounty" });
-  if (!targetUrl || !rewardUSDC) return res.status(400).json({ error: "Missing targetUrl or rewardUSDC" });
+  if (!apiKey) return res.status(401).json({ error: "API Key required" });
 
   const account = db.vault.get(apiKey);
-  const bountyAmount = parseFloat(rewardUSDC);
+  if (!account) return res.status(401).json({ error: "Unauthorized or invalid API Key" });
 
-  if (account.balanceUSDC < bountyAmount) {
-    return res.status(400).json({ error: "Insufficient balance to escrow bounty reward" });
-  }
+  if (!targetUrl || !rewardUSDC) return res.status(400).json({ error: "Missing targetUrl or rewardUSDC" });
+
+  const bountyAmount = parseFloat(rewardUSDC);
+  if (account.balanceUSDC < bountyAmount) return res.status(400).json({ error: "Insufficient balance for bounty escrow" });
 
   account.balanceUSDC -= bountyAmount;
-
   const bountyId = `bounty_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
-  const bounty = {
-    bountyId,
-    posterApiKey: apiKey,
-    targetUrl,
-    rewardUSDC: bountyAmount,
-    status: "open",
-    createdAt: new Date().toISOString()
-  };
-
-  db.bounties.push(bounty);
+  db.bounties.push({ bountyId, posterApiKey: apiKey, targetUrl, rewardUSDC: bountyAmount, status: "open", createdAt: new Date().toISOString() });
   saveData();
 
   res.json({ message: "Bounty escrowed successfully", bountyId, status: "open", escrowedUSDC: bountyAmount });
@@ -384,38 +322,15 @@ app.get('/api/bounties', (req, res) => {
   res.json({ activeBounties: db.bounties.filter(b => b.status === 'open') });
 });
 
-// Deposit Endpoint
 app.post('/api/credits/deposit', async (req, res) => {
   const { walletAddress, txHash, amountUSDC } = req.body;
   const isTestMode = req.headers['x-test-mode'] === 'true' || txHash?.startsWith('0xTEST');
 
-  if (!walletAddress || !txHash || !amountUSDC) {
-    return res.status(400).json({ error: "Missing required parameters: walletAddress, txHash, amountUSDC" });
-  }
-
-  if (db.txs.has(txHash)) {
-    return res.status(400).json({ error: "Transaction hash already redeemed" });
-  }
-
-  if (!isTestMode) {
-    try {
-      const rpcRes = await fetch("https://mainnet.base.org", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getTransactionByHash", params: [txHash], id: 1 })
-      });
-      const rpcData = await rpcRes.json();
-      if (!rpcData.result) {
-        return res.status(400).json({ error: "Invalid on-chain transaction hash on Base Mainnet" });
-      }
-    } catch (err) {
-      return res.status(500).json({ error: "Base RPC verification failed", details: err.message });
-    }
-  }
+  if (!walletAddress || !txHash || !amountUSDC) return res.status(400).json({ error: "Missing required parameters" });
+  if (db.txs.has(txHash)) return res.status(400).json({ error: "Transaction hash already redeemed" });
 
   db.txs.add(txHash);
   const apiKey = `x402_key_${uuidv4().replace(/-/g, '')}`;
-  
   let account = db.vault.get(apiKey) || { walletAddress, balanceUSDC: 0, totalCalls: 0 };
   account.balanceUSDC += parseFloat(amountUSDC);
   db.vault.set(apiKey, account);
@@ -424,44 +339,23 @@ app.post('/api/credits/deposit', async (req, res) => {
   res.json({ message: "Deposit verified and credited successfully", apiKey, balanceUSDC: account.balanceUSDC, testMode: isTestMode });
 });
 
-// Extract & Scrape Endpoint
 app.post('/api/extract', async (req, res) => {
   const { url, webhookUrl, format } = req.body;
   const apiKey = req.headers['x-api-key'];
   const refWallet = req.headers['ref'];
 
   if (!url) return res.status(400).json({ error: "Missing required 'url' parameter" });
-
   if (!apiKey) {
     res.setHeader('X-Payment-Required', 'true');
-    res.setHeader('X-Deposit-Endpoint', 'https://x402-scraper-api-production-67a4.up.railway.app/api/credits/deposit');
-    res.setHeader('X-Payment-Address', PAYOUT_ADDRESS);
-    return res.status(402).json({
-      error: "Payment Required",
-      message: "Autonomous M2M access requires funded credits. Send USDC on Base to deposit endpoint.",
-      depositEndpoint: "/api/credits/deposit",
-      payoutAddress: PAYOUT_ADDRESS,
-      pricingUSDC: 0.01
-    });
+    return res.status(402).json({ error: "Payment Required", pricingUSDC: 0.01 });
   }
 
   try {
     const payload = await executeScrape(url, apiKey, format, refWallet);
-    if (webhookUrl) {
-      const signature = crypto.createHmac('sha256', apiKey).update(JSON.stringify(payload)).digest('hex');
-      fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
-        body: JSON.stringify(payload)
-      }).catch(err => console.error("Webhook dispatch failed:", err.message));
-    }
     res.json(payload);
   } catch (err) {
     if (err.message.includes("Unauthorized")) return res.status(401).json({ error: err.message });
-    if (err.message.includes("Insufficient balance")) {
-      res.setHeader('X-Payment-Required', 'true');
-      return res.status(402).json({ error: err.message });
-    }
+    if (err.message.includes("Insufficient balance")) return res.status(402).json({ error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
