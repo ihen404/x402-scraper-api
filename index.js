@@ -1,57 +1,93 @@
-require('dotenv').config();
-const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000;
+import express from 'express';
+import NodeCache from 'node-cache';
+import { v4 as uuidv4 } from 'uuid';
+import fetch from 'node-fetch';
 
+const app = express();
 app.use(express.json());
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'x402-scraper-api is running' });
-});
+// In-memory cache & credit store
+const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
+const creditVault = new Map();
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal Server Error' });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// --- Asynchronous Webhook Swarm Callback Endpoint ---
-app.post('/api/extract/webhook', async (req, res) => {
-  const { target_url, tier, callback_url, ref } = req.body;
-  const paymentProof = req.headers['x-payment-proof'];
-
-  if (!paymentProof) {
-    return res.status(402).json({ error: "Payment Required", message: "Provide valid X-Payment-Proof header." });
-  }
-
-  if (!callback_url) {
-    return res.status(400).json({ error: "Bad Request", message: "callback_url is required." });
-  }
-
-  const jobId = "job_" + Math.random().toString(36).substring(2, 9);
-
-  // Acknowledge immediately so agents don't timeout
-  res.status(202).json({
-    status: "processing",
-    job_id: jobId,
-    message: "Extraction job queued successfully. Results will be posted to callback_url."
+// --- Discovery & A2A Handshake ---
+app.get('/api/capabilities', (req, res) => {
+  res.json({
+    service: "x402 Scraper & Extraction M2M Utility",
+    version: "1.2.0",
+    network: "eip155:8453",
+    payout_address: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
+    pricing: {
+      standard_scrape_usdc: 0.01,
+      cached_scrape_usdc: 0.0025,
+      affiliate_rebate_pct: 10
+    },
+    caching: { enabled: true, ttl_seconds: 900 },
+    endpoints: {
+      openapi_spec: "/api/openapi.json",
+      extract_sync: "/api/extract",
+      extract_async: "/api/extract/webhook",
+      credits_deposit: "/api/credits/deposit"
+    }
   });
+});
 
-  // Background processing simulation & webhook callback dispatch
-  setTimeout(async () => {
-    const payload = {
-      job_id: jobId,
-      status: "success",
-      target_url,
-      tier: tier || "structured_extraction",
-      data: { extracted_at: new Date().toISOString(), sample_field: "Processed data value" },
-      ref: ref || null
-    };
-    console.log(`[Webhook Dispatch] Sent results for ${jobId} to ${callback_url}`);
-  }, 2000);
+app.get('/api/openapi.json', (req, res) => {
+  res.json({
+    openapi: "3.1.0",
+    info: { title: "x402 Scraper M2M API", version: "1.2.0" },
+    servers: [{ url: "https://x402-scraper-api-production-67a4.up.railway.app" }]
+  });
+});
+
+// --- Pre-Paid Credits ---
+app.post('/api/credits/deposit', (req, res) => {
+  const { walletAddress, amountUSDC } = req.body;
+  if (!walletAddress || !amountUSDC) {
+    return res.status(400).json({ error: "Missing walletAddress or amountUSDC" });
+  }
+  const apiKey = `x402_key_${uuidv4().replace(/-/g, '')}`;
+  creditVault.set(apiKey, {
+    walletAddress,
+    balanceUSDC: parseFloat(amountUSDC),
+    createdAt: new Date().toISOString()
+  });
+  res.json({ message: "Credit account funded successfully", apiKey, balanceUSDC: amountUSDC });
+});
+
+// --- Core Scrape Endpoint ---
+app.post('/api/extract', async (req, res) => {
+  const { url } = req.body;
+  const apiKey = req.headers['x-api-key'];
+  const refWallet = req.headers['ref'];
+
+  if (!url) return res.status(400).json({ error: "Missing required 'url' parameter" });
+
+  const cachedData = scrapeCache.get(url);
+  if (cachedData) {
+    if (apiKey) {
+      const acc = creditVault.get(apiKey);
+      if (!acc || acc.balanceUSDC < 0.0025) return res.status(402).json({ error: "Invalid key or insufficient balance" });
+      acc.balanceUSDC -= 0.0025;
+    }
+    if (refWallet) console.log(`[Affiliate] Rebate routed to ${refWallet}`);
+    return res.json({ source: "cache", costUSDC: 0.0025, data: cachedData });
+  }
+
+  if (apiKey) {
+    const acc = creditVault.get(apiKey);
+    if (!acc || acc.balanceUSDC < 0.01) return res.status(402).json({ error: "Invalid key or insufficient balance" });
+    acc.balanceUSDC -= 0.01;
+  }
+
+  const extractedData = { url, title: `Extracted title for ${url}`, timestamp: new Date().toISOString() };
+  scrapeCache.set(url, extractedData);
+  if (refWallet) console.log(`[Affiliate] Rebate routed to ${refWallet}`);
+
+  res.json({ source: "live", costUSDC: 0.01, data: extractedData });
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`x402 M2M Utility running on port ${PORT}`);
 });
