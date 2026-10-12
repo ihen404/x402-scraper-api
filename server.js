@@ -1,7 +1,6 @@
 import express from 'express';
 import NodeCache from 'node-cache';
 import { v4 as uuidv4 } from 'uuid';
-import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
 
@@ -9,18 +8,18 @@ const app = express();
 app.use(express.json());
 
 const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
-const creditVault = new Map(); // apiKey -> { walletAddress, balanceUSDC }
-const verifiedTxs = new Set();  // prevents double-spending tx hashes
+const creditVault = new Map(); 
+const verifiedTxs = new Set();  
 
 // --- Root & Capabilities ---
 app.get('/', (req, res) => {
-  res.json({ status: "online", service: "x402-scraper-api", version: "2.0.0" });
+  res.json({ status: "online", service: "x402-scraper-api", version: "2.1.0" });
 });
 
 app.get('/api/capabilities', (req, res) => {
   res.json({
     service: "x402 Scraper & Extraction M2M Utility",
-    version: "2.0.0",
+    version: "2.1.0",
     network: "eip155:8453",
     payout_address: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
     pricing: { standard_scrape_usdc: 0.01, cached_scrape_usdc: 0.0025, affiliate_rebate_pct: 10 },
@@ -88,7 +87,7 @@ app.post('/api/extract', async (req, res) => {
     payload = { source: "cache", costUSDC: cost, data: cachedData };
   } else {
     try {
-      const response = await fetch(url, { headers: { 'User-Agent': 'x402-scraper-bot/2.0' } });
+      const response = await fetch(url, { headers: { 'User-Agent': 'x402-scraper-bot/2.1' } });
       const html = await response.text();
       const $ = cheerio.load(html);
 
@@ -132,5 +131,5 @@ app.use('*', (req, res) => {
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`x402 Scraper API v2.0 running on 0.0.0.0:${PORT}`);
+  console.log(`x402 Scraper API v2.1 running on 0.0.0.0:${PORT}`);
 });
