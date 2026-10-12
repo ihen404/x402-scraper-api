@@ -36,19 +36,23 @@ function loadData() {
   return { vault: new Map(), txs: new Set(), affiliates: [], usageLogs: [], bounties: [] };
 }
 
+let saveTimeout = null;
 function saveData() {
-  try {
-    const payload = {
-      vault: Object.fromEntries(db.vault),
-      txs: Array.from(db.txs),
-      affiliates: db.affiliates,
-      usageLogs: db.usageLogs,
-      bounties: db.bounties
-    };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2));
-  } catch (e) {
-    console.error("Error saving data file:", e);
-  }
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      const payload = {
+        vault: Object.fromEntries(db.vault),
+        txs: Array.from(db.txs),
+        affiliates: db.affiliates,
+        usageLogs: db.usageLogs,
+        bounties: db.bounties
+      };
+      fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2));
+    } catch (e) {
+      console.error("Error saving data file:", e);
+    }
+  }, 2000); // Debounced 2-second async write buffer
 }
 
 const db = loadData();

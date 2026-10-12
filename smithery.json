@@ -1,0 +1,24 @@
+{
+  "mcpVersion": "1.0.0",
+  "name": "x402-scraper-api",
+  "version": "3.2.0",
+  "description": "Autonomous M2M HTTP 402 scraper, prompt-sanitized RAG extractor, and bounty escrow utility for agent swarms.",
+  "transport": {
+    "type": "sse",
+    "url": "https://x402-scraper-api-production-67a4.up.railway.app/.well-known/mcp.json"
+  },
+  "capabilities": {
+    "tools": [
+      "extract",
+      "sanitize",
+      "bounties",
+      "transfer"
+    ]
+  },
+  "pricing": {
+    "model": "per-call",
+    "currency": "USDC",
+    "network": "Base",
+    "payoutAddress": "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28"
+  }
+}

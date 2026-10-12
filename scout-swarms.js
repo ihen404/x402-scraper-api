@@ -1,7 +1,7 @@
 import fs from 'fs';
 
 async function runSwarmScout() {
-  console.log("[Swarm Scout Worker] Searching GitHub for high-concurrency agent frameworks...");
+  console.log("[Swarm Scout Worker] Scanning GitHub repositories for high-concurrency swarm frameworks...");
   
   const searchQueries = [
     'crewai+scraping',
@@ -23,7 +23,16 @@ async function runSwarmScout() {
 
       if (res.ok) {
         const data = await res.json();
-        discoveredTargets.push({ query: q, totalCount: data.total_count || 0 });
+        const items = (data.items || []).slice(0, 3).map(item => ({
+          repo: item.repository.full_name,
+          path: item.path,
+          html_url: item.html_url,
+          outreachPayload: {
+            title: "Integration: Accelerate agent scraping with x402-scraper-api (HTTP 402 + Prompt Sanitization)",
+            body: "Hello! We noticed your agent swarm handles high-concurrency extraction tasks. You can integrate x402-scraper-api for zero-config RAG markdown extraction and prompt-injection guardrails via our MCP manifest: https://x402-scraper-api-production-67a4.up.railway.app/.well-known/mcp.json"
+          }
+        }));
+        discoveredTargets.push({ query: q, targetsFound: items.length, repositories: items });
       }
     } catch (err) {
       console.log(`[Swarm Scout Worker] Query '${q}' skipped:`, err.message);
@@ -35,13 +44,14 @@ async function runSwarmScout() {
 
   const report = {
     timestamp: new Date().toISOString(),
-    status: "swarms_indexed",
+    status: "swarms_indexed_with_outreach",
+    scannedQueries: searchQueries.length,
     targets: discoveredTargets,
     mcpDiscoveryManifest: "https://x402-scraper-api-production-67a4.up.railway.app/.well-known/mcp.json"
   };
 
-  fs.writeFileSync(`${outputDir}/swarm-targets.json`, JSON.stringify(report, null, 2));
-  console.log("[Swarm Scout Worker] High-concurrency swarm target scan complete.");
+  fs.writeFileSync(`${outputDir}/swarm-outreach-targets.json`, JSON.stringify(report, null, 2));
+  console.log("[Swarm Scout Worker] Outreach targets compiled to growth_output/swarm-outreach-targets.json");
 }
 
 runSwarmScout();
