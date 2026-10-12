@@ -1,2 +1,2 @@
-[phases.setup]
-nixPkgs = ["nodejs", "chromium"]
+[start]
+cmd = "node index.js"
