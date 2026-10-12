@@ -25,13 +25,14 @@ function loadData() {
       return {
         vault: new Map(Object.entries(parsed.vault || {})),
         txs: new Set(parsed.txs || []),
-        affiliates: parsed.affiliates || []
+        affiliates: parsed.affiliates || [],
+        usageLogs: parsed.usageLogs || []
       };
     } catch (e) {
       console.error("Error loading data file:", e);
     }
   }
-  return { vault: new Map(), txs: new Set(), affiliates: [] };
+  return { vault: new Map(), txs: new Set(), affiliates: [], usageLogs: [] };
 }
 
 function saveData() {
@@ -39,7 +40,8 @@ function saveData() {
     const payload = {
       vault: Object.fromEntries(db.vault),
       txs: Array.from(db.txs),
-      affiliates: db.affiliates
+      affiliates: db.affiliates,
+      usageLogs: db.usageLogs
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2));
   } catch (e) {
@@ -56,8 +58,16 @@ async function executeScrape(url, apiKey, format, refWallet) {
   const account = db.vault.get(apiKey);
   if (!account) throw new Error("Unauthorized or invalid API Key");
 
+  // Calculate volume calls for this key to determine Volume Tier
+  const keyUsageCount = (account.totalCalls || 0) + 1;
+  account.totalCalls = keyUsageCount;
+
+  const isTier2Volume = keyUsageCount > 1000;
+  const standardRate = isTier2Volume ? 0.008 : 0.01;
+
   const cachedData = scrapeCache.get(url);
-  const cost = cachedData ? 0.0025 : 0.01;
+  const cost = cachedData ? 0.0025 : standardRate;
+  const isCacheHit = !!cachedData;
 
   if (account.balanceUSDC < cost) {
     throw new Error(`Insufficient balance. Required: ${cost}, Current: ${account.balanceUSDC}`);
@@ -102,10 +112,25 @@ async function executeScrape(url, apiKey, format, refWallet) {
       payload = { source: "live", costUSDC: cost, data: extracted };
     } catch (err) {
       account.balanceUSDC += cost;
+      account.totalCalls -= 1;
       saveData();
       throw new Error(`Failed to scrape target URL: ${err.message}`);
     }
   }
+
+  // Calculate savings/discounts relative to baseline $0.01 live call
+  const baselineCost = 0.01;
+  const clientSavings = baselineCost - cost;
+
+  // Log usage record for Daily Analytics reporting
+  db.usageLogs.push({
+    apiKey,
+    costUSDC: cost,
+    isCacheHit,
+    tier: isTier2Volume ? "Tier 2 (Volume > 1k)" : "Tier 1 (Standard)",
+    savingsUSDC: clientSavings > 0 ? clientSavings : 0,
+    timestamp: new Date().toISOString()
+  });
 
   if (refWallet) {
     const rebateAmount = cost * 0.10;
@@ -119,7 +144,6 @@ async function executeScrape(url, apiKey, format, refWallet) {
 // --- Autonomous Growth Scout Worker Loop ---
 async function runGrowthScoutTask() {
   console.log("[Growth Scout Worker] Starting 24/7 autonomous ecosystem scan...");
-  
   try {
     const res = await fetch("https://api.github.com/search/code?q=mcpServers+filename:config.json", {
       headers: { 
@@ -152,13 +176,10 @@ async function runGrowthScoutTask() {
   };
 
   fs.writeFileSync(`${outputDir}/scout-status.json`, JSON.stringify(scoutReport, null, 2));
-  console.log(`[Growth Scout Worker] Cycle completed at ${timestamp}. Next run scheduled in 6 hours.`);
 }
 
 function startAutonomousGrowthScout() {
-  // Execute immediately on startup
   runGrowthScoutTask().catch(err => console.error("[Growth Scout Worker] Error:", err));
-  // Schedule recurring loop every 6 hours (6 * 60 * 60 * 1000 ms)
   setInterval(() => {
     runGrowthScoutTask().catch(err => console.error("[Growth Scout Worker] Error:", err));
   }, 21600000);
@@ -175,8 +196,62 @@ app.get('/api/capabilities', (req, res) => {
     version: "3.2.0",
     network: "eip155:8453",
     payout_address: PAYOUT_ADDRESS,
-    pricing: { standard_scrape_usdc: 0.01, cached_scrape_usdc: 0.0025, affiliate_rebate_pct: 10 },
-    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Server-Enabled", "Background-Growth-Worker"]
+    pricing: {
+      standard_tier1_usdc: 0.01,
+      volume_tier2_usdc: 0.008,
+      cached_scrape_usdc: 0.0025,
+      affiliate_rebate_pct: 10
+    },
+    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Server-Enabled", "Daily-Tier-Analytics"]
+  });
+});
+
+// Daily Analytics & Tier Breakdown Endpoint
+app.get('/api/analytics/daily', (req, res) => {
+  const logs = db.usageLogs || [];
+  
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+  const recentLogs = logs.filter(l => new Date(l.timestamp) >= oneDayAgo);
+
+  let tier1Calls = 0;
+  let tier2Calls = 0;
+  let cacheHits = 0;
+  let liveScrapes = 0;
+  let totalRevenueUSDC = 0;
+  let totalClientDiscountUSDC = 0;
+
+  for (const log of recentLogs) {
+    totalRevenueUSDC += log.costUSDC;
+    totalClientDiscountUSDC += log.savingsUSDC;
+
+    if (log.isCacheHit) cacheHits++;
+    else liveScrapes++;
+
+    if (log.tier.includes("Tier 2")) tier2Calls++;
+    else tier1Calls++;
+  }
+
+  res.json({
+    reportTimestamp: now.toISOString(),
+    window: "24 Hours",
+    summary: {
+      totalCalls: recentLogs.length,
+      totalRevenueUSDC: parseFloat(totalRevenueUSDC.toFixed(4)),
+      totalClientSavingsUSDC: parseFloat(totalClientDiscountUSDC.toFixed(4))
+    },
+    tierBreakdown: {
+      tier1_standard_calls: tier1Calls,
+      tier2_volume_calls: tier2Calls,
+      cache_hit_calls: cacheHits,
+      live_scrape_calls: liveScrapes
+    },
+    pricingStructure: {
+      tier1_standard_rate: "$0.01",
+      tier2_volume_rate: "$0.008 (Calls > 1,000)",
+      cache_discount_rate: "$0.0025 (Save $0.0075/call)"
+    }
   });
 });
 
@@ -189,7 +264,7 @@ app.get('/api/affiliates/stats', (req, res) => {
 
   res.json({
     referrerWallet: wallet,
-    totalRebateUSDC: totalEarnedUSDC,
+    totalRebateUSDC: parseFloat(totalEarnedUSDC.toFixed(4)),
     totalTransactions: records.length,
     history: records.slice(-20)
   });
@@ -226,7 +301,7 @@ app.post('/api/credits/deposit', async (req, res) => {
   db.txs.add(txHash);
   const apiKey = `x402_key_${uuidv4().replace(/-/g, '')}`;
   
-  let account = db.vault.get(apiKey) || { walletAddress, balanceUSDC: 0 };
+  let account = db.vault.get(apiKey) || { walletAddress, balanceUSDC: 0, totalCalls: 0 };
   account.balanceUSDC += parseFloat(amountUSDC);
   db.vault.set(apiKey, account);
   saveData();
@@ -278,6 +353,5 @@ app.post('/api/extract', async (req, res) => {
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`x402 Scraper API v3.2 running on 0.0.0.0:${PORT}`);
-  // Launch autonomous background growth worker
   startAutonomousGrowthScout();
 });
