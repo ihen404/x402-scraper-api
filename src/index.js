@@ -6,6 +6,11 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
+// MCP SDK Imports
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+
 const app = express();
 app.use(express.json());
 
@@ -23,7 +28,7 @@ function loadData() {
         affiliates: parsed.affiliates || []
       };
     } catch (e) {
-      console.error("Error loading data file, initializing fresh store:", e);
+      console.error("Error loading data file:", e);
     }
   }
   return { vault: new Map(), txs: new Set(), affiliates: [] };
@@ -46,23 +51,87 @@ const db = loadData();
 const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 const PAYOUT_ADDRESS = "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28";
 
-// --- Root & Capabilities ---
+// --- Core Scraping Logic Function ---
+async function executeScrape(url, apiKey, format, refWallet) {
+  const account = db.vault.get(apiKey);
+  if (!account) throw new Error("Unauthorized or invalid API Key");
+
+  const cachedData = scrapeCache.get(url);
+  const cost = cachedData ? 0.0025 : 0.01;
+
+  if (account.balanceUSDC < cost) {
+    throw new Error(`Insufficient balance. Required: ${cost}, Current: ${account.balanceUSDC}`);
+  }
+
+  account.balanceUSDC -= cost;
+
+  let payload;
+  if (cachedData) {
+    payload = { source: "cache", costUSDC: cost, data: cachedData };
+  } else {
+    try {
+      const response = await fetch(url, { headers: { 'User-Agent': 'x402-agent-scraper/3.2' } });
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      const title = $('title').text().trim() || null;
+      const description = $('meta[name="description"]').attr('content') || null;
+      const textSnippet = $('p').first().text().trim() || "";
+
+      let extracted;
+      if (format === 'markdown') {
+        const headingsList = $('h1, h2').map((_, el) => `## ${$(el).text().trim()}`).get().join('\n\n');
+        extracted = {
+          url,
+          format: 'markdown',
+          content: `# ${title}\n\n> ${description || ''}\n\n${headingsList}\n\n${textSnippet}`,
+          timestamp: new Date().toISOString()
+        };
+      } else {
+        extracted = {
+          url,
+          title,
+          description,
+          headings: $('h1, h2').map((_, el) =>$(el).text().trim()).get().slice(0, 10),
+          textSnippet,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      scrapeCache.set(url, extracted);
+      payload = { source: "live", costUSDC: cost, data: extracted };
+    } catch (err) {
+      account.balanceUSDC += cost;
+      saveData();
+      throw new Error(`Failed to scrape target URL: ${err.message}`);
+    }
+  }
+
+  if (refWallet) {
+    const rebateAmount = cost * 0.10;
+    db.affiliates.push({ referrerWallet: refWallet, rebateUSDC: rebateAmount, apiKey, timestamp: new Date().toISOString() });
+  }
+
+  saveData();
+  return payload;
+}
+
+// --- Express API Routes ---
 app.get('/', (req, res) => {
-  res.json({ status: "online", service: "x402-scraper-api", version: "3.1.0-agentic" });
+  res.json({ status: "online", service: "x402-scraper-api", version: "3.2.0-agentic" });
 });
 
 app.get('/api/capabilities', (req, res) => {
   res.json({
     service: "x402 Autonomous M2M Scraper & Extraction Utility",
-    version: "3.1.0",
+    version: "3.2.0",
     network: "eip155:8453",
     payout_address: PAYOUT_ADDRESS,
     pricing: { standard_scrape_usdc: 0.01, cached_scrape_usdc: 0.0025, affiliate_rebate_pct: 10 },
-    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Compatible"]
+    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Server-Enabled"]
   });
 });
 
-// --- On-Chain Settlement Verification & Deposit ---
 app.post('/api/credits/deposit', async (req, res) => {
   const { walletAddress, txHash, amountUSDC } = req.body;
   const isTestMode = req.headers['x-test-mode'] === 'true' || txHash?.startsWith('0xTEST');
@@ -102,7 +171,6 @@ app.post('/api/credits/deposit', async (req, res) => {
   res.json({ message: "Deposit verified and credited successfully", apiKey, balanceUSDC: account.balanceUSDC, testMode: isTestMode });
 });
 
-// --- Autonomous Scrape & Extraction with HTTP 402 & Markdown RAG Output ---
 app.post('/api/extract', async (req, res) => {
   const { url, webhookUrl, format } = req.body;
   const apiKey = req.headers['x-api-key'];
@@ -123,91 +191,77 @@ app.post('/api/extract', async (req, res) => {
     });
   }
 
-  const account = db.vault.get(apiKey);
-  if (!account) {
-    return res.status(401).json({ error: "Unauthorized or invalid API Key" });
+  try {
+    const payload = await executeScrape(url, apiKey, format, refWallet);
+    if (webhookUrl) {
+      const signature = crypto.createHmac('sha256', apiKey).update(JSON.stringify(payload)).digest('hex');
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("Webhook dispatch failed:", err.message));
+    }
+    res.json(payload);
+  } catch (err) {
+    if (err.message.includes("Unauthorized")) return res.status(401).json({ error: err.message });
+    if (err.message.includes("Insufficient balance")) {
+      res.setHeader('X-Payment-Required', 'true');
+      return res.status(402).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message });
   }
+});
 
-  const cachedData = scrapeCache.get(url);
-  const cost = cachedData ? 0.0025 : 0.01;
+// --- Model Context Protocol (MCP) Server Setup ---
+if (process.env.MCP_MODE === 'true') {
+  const mcpServer = new Server({
+    name: "x402-scraper-mcp",
+    version: "3.2.0"
+  }, {
+    capabilities: { tools: {} }
+  });
 
-  if (account.balanceUSDC < cost) {
-    res.setHeader('X-Payment-Required', 'true');
-    return res.status(402).json({ error: "Insufficient balance", required: cost, current: account.balanceUSDC });
-  }
+  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "extract_web_content",
+        description: "Scrapes a URL and extracts token-optimized structured JSON or Markdown data for RAG pipelines via the x402 M2M network.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "The target URL to scrape" },
+            apiKey: { type: "string", description: "Your x402 API key" },
+            format: { type: "string", enum: ["json", "markdown"], description: "Output format (default json)" }
+          },
+          required: ["url", "apiKey"]
+        }
+      }
+    ]
+  }));
 
-  account.balanceUSDC -= cost;
-
-  let payload;
-  if (cachedData) {
-    payload = { source: "cache", costUSDC: cost, data: cachedData };
-  } else {
-    try {
-      const response = await fetch(url, { headers: { 'User-Agent': 'x402-agent-scraper/3.1' } });
-      const html = await response.text();
-      const $ = cheerio.load(html);
-
-      const title = $('title').text().trim() || null;
-      const description = $('meta[name="description"]').attr('content') || null;
-      const textSnippet = $('p').first().text().trim() || "";
-
-      let extracted;
-      if (format === 'markdown') {
-        const headingsList = $('h1, h2').map((_, el) => `## ${$(el).text().trim()}`).get().join('\n\n');
-        extracted = {
-          url,
-          format: 'markdown',
-          content: `# ${title}\n\n> ${description || ''}\n\n${headingsList}\n\n${textSnippet}`,
-          timestamp: new Date().toISOString()
+  mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "extract_web_content") {
+      const { url, apiKey, format } = request.params.arguments;
+      try {
+        const result = await executeScrape(url, apiKey, format, PAYOUT_ADDRESS);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
         };
-      } else {
-        extracted = {
-          url,
-          title,
-          description,
-          headings: $('h1, h2').map((_, el) =>$(el).text().trim()).get().slice(0, 10),
-          textSnippet,
-          timestamp: new Date().toISOString()
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: err.message }) }],
+          isError: true
         };
       }
-
-      scrapeCache.set(url, extracted);
-      payload = { source: "live", costUSDC: cost, data: extracted };
-    } catch (err) {
-      account.balanceUSDC += cost; 
-      saveData();
-      return res.status(500).json({ error: "Failed to scrape target URL", details: err.message });
     }
-  }
+    throw new Error(`Unknown tool: ${request.params.name}`);
+  });
 
-  // Affiliate Ledger Tracking
-  if (refWallet) {
-    const rebateAmount = cost * 0.10;
-    db.affiliates.push({ referrerWallet: refWallet, rebateUSDC: rebateAmount, apiKey, timestamp: new Date().toISOString() });
-    console.log(`[Affiliate Ledger] Credited ${rebateAmount} USDC rebate to referrer ${refWallet}`);
-  }
-
-  saveData();
-
-  // Webhook Dispatch
-  if (webhookUrl) {
-    const signature = crypto.createHmac('sha256', apiKey).update(JSON.stringify(payload)).digest('hex');
-    fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Signature': signature },
-      body: JSON.stringify(payload)
-    }).catch(err => console.error("Webhook dispatch failed:", err.message));
-  }
-
-  res.json(payload);
-});
-
-// --- Catch-all Fallback ---
-app.use('*', (req, res) => {
-  res.status(404).json({ error: "Route not found", path: req.originalUrl });
-});
-
-const PORT = parseInt(process.env.PORT, 10) || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`x402 Scraper API v3.1 running on 0.0.0.0:${PORT}`);
-});
+  const transport = new StdioServerTransport();
+  mcpServer.connect(transport).catch(err => console.error("MCP Server Error:", err));
+} else {
+  const PORT = parseInt(process.env.PORT, 10) || 8080;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`x402 Scraper API v3.2 running on 0.0.0.0:${PORT}`);
+  });
+}
