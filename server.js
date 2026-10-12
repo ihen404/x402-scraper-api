@@ -1,53 +1,64 @@
 import express from 'express';
-import Database from 'better-sqlite3';
 import NodeCache from 'node-cache';
 import { v4 as uuidv4 } from 'uuid';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 app.use(express.json());
 
-// --- Database & Cache Setup ---
-const db = new Database('x402_production.db');
-db.pragma('journal_mode = WAL');
+// --- Durable JSON Storage Engine ---
+const DATA_FILE = path.resolve('x402_data.json');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS credit_vault (
-    api_key TEXT PRIMARY KEY,
-    wallet_address TEXT NOT NULL,
-    balance_usdc REAL NOT NULL DEFAULT 0
-  );
+function loadData() {
+  if (fs.existsSync(DATA_FILE)) {
+    try {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        vault: new Map(Object.entries(parsed.vault || {})),
+        txs: new Set(parsed.txs || []),
+        affiliates: parsed.affiliates || []
+      };
+    } catch (e) {
+      console.error("Error loading data file, initializing fresh store:", e);
+    }
+  }
+  return { vault: new Map(), txs: new Set(), affiliates: [] };
+}
 
-  CREATE TABLE IF NOT EXISTS verified_txs (
-    tx_hash TEXT PRIMARY KEY
-  );
+function saveData() {
+  try {
+    const payload = {
+      vault: Object.fromEntries(db.vault),
+      txs: Array.from(db.txs),
+      affiliates: db.affiliates
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2));
+  } catch (e) {
+    console.error("Error saving data file:", e);
+  }
+}
 
-  CREATE TABLE IF NOT EXISTS affiliate_ledger (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    referrer_wallet TEXT NOT NULL,
-    rebate_usdc REAL NOT NULL,
-    source_api_key TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
-
+const db = loadData();
 const scrapeCache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 const PAYOUT_ADDRESS = "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28";
 
 // --- Root & Capabilities ---
 app.get('/', (req, res) => {
-  res.json({ status: "online", service: "x402-scraper-api", version: "3.0.0-agentic" });
+  res.json({ status: "online", service: "x402-scraper-api", version: "3.1.0-agentic" });
 });
 
 app.get('/api/capabilities', (req, res) => {
   res.json({
     service: "x402 Autonomous M2M Scraper & Extraction Utility",
-    version: "3.0.0",
+    version: "3.1.0",
     network: "eip155:8453",
     payout_address: PAYOUT_ADDRESS,
     pricing: { standard_scrape_usdc: 0.01, cached_scrape_usdc: 0.0025, affiliate_rebate_pct: 10 },
-    features: ["HTTP-402-Negotiation", "SQLite-Persistence", "Markdown-RAG-Transform", "MCP-Compatible"]
+    features: ["HTTP-402-Negotiation", "Durable-File-Persistence", "Markdown-RAG-Transform", "MCP-Compatible"]
   });
 });
 
@@ -60,8 +71,7 @@ app.post('/api/credits/deposit', async (req, res) => {
     return res.status(400).json({ error: "Missing required parameters: walletAddress, txHash, amountUSDC" });
   }
 
-  const existingTx = db.prepare('SELECT tx_hash FROM verified_txs WHERE tx_hash = ?').get(txHash);
-  if (existingTx) {
+  if (db.txs.has(txHash)) {
     return res.status(400).json({ error: "Transaction hash already redeemed" });
   }
 
@@ -81,19 +91,15 @@ app.post('/api/credits/deposit', async (req, res) => {
     }
   }
 
-  db.prepare('INSERT INTO verified_txs (tx_hash) VALUES (?)').run(txHash);
+  db.txs.add(txHash);
   const apiKey = `x402_key_${uuidv4().replace(/-/g, '')}`;
   
-  const existingAccount = db.prepare('SELECT balance_usdc FROM credit_vault WHERE api_key = ?').get(apiKey);
-  const newBalance = (existingAccount ? existingAccount.balance_usdc : 0) + parseFloat(amountUSDC);
+  let account = db.vault.get(apiKey) || { walletAddress, balanceUSDC: 0 };
+  account.balanceUSDC += parseFloat(amountUSDC);
+  db.vault.set(apiKey, account);
+  saveData();
 
-  db.prepare(`
-    INSERT INTO credit_vault (api_key, wallet_address, balance_usdc) 
-    VALUES (?, ?, ?) 
-    ON CONFLICT(api_key) DO UPDATE SET balance_usdc = balance_usdc + ?
-  `).run(apiKey, walletAddress, newBalance, parseFloat(amountUSDC));
-
-  res.json({ message: "Deposit verified and credited successfully", apiKey, balanceUSDC: newBalance, testMode: isTestMode });
+  res.json({ message: "Deposit verified and credited successfully", apiKey, balanceUSDC: account.balanceUSDC, testMode: isTestMode });
 });
 
 // --- Autonomous Scrape & Extraction with HTTP 402 & Markdown RAG Output ---
@@ -117,7 +123,7 @@ app.post('/api/extract', async (req, res) => {
     });
   }
 
-  const account = db.prepare('SELECT * FROM credit_vault WHERE api_key = ?').get(apiKey);
+  const account = db.vault.get(apiKey);
   if (!account) {
     return res.status(401).json({ error: "Unauthorized or invalid API Key" });
   }
@@ -125,20 +131,19 @@ app.post('/api/extract', async (req, res) => {
   const cachedData = scrapeCache.get(url);
   const cost = cachedData ? 0.0025 : 0.01;
 
-  if (account.balance_usdc < cost) {
+  if (account.balanceUSDC < cost) {
     res.setHeader('X-Payment-Required', 'true');
-    return res.status(402).json({ error: "Insufficient balance", required: cost, current: account.balance_usdc });
+    return res.status(402).json({ error: "Insufficient balance", required: cost, current: account.balanceUSDC });
   }
 
-  // Deduct cost
-  db.prepare('UPDATE credit_vault SET balance_usdc = balance_usdc - ? WHERE api_key = ?').run(cost, apiKey);
+  account.balanceUSDC -= cost;
 
   let payload;
   if (cachedData) {
     payload = { source: "cache", costUSDC: cost, data: cachedData };
   } else {
     try {
-      const response = await fetch(url, { headers: { 'User-Agent': 'x402-agent-scraper/3.0' } });
+      const response = await fetch(url, { headers: { 'User-Agent': 'x402-agent-scraper/3.1' } });
       const html = await response.text();
       const $ = cheerio.load(html);
 
@@ -169,7 +174,8 @@ app.post('/api/extract', async (req, res) => {
       scrapeCache.set(url, extracted);
       payload = { source: "live", costUSDC: cost, data: extracted };
     } catch (err) {
-      db.prepare('UPDATE credit_vault SET balance_usdc = balance_usdc + ? WHERE api_key = ?').run(cost, apiKey);
+      account.balanceUSDC += cost; 
+      saveData();
       return res.status(500).json({ error: "Failed to scrape target URL", details: err.message });
     }
   }
@@ -177,9 +183,11 @@ app.post('/api/extract', async (req, res) => {
   // Affiliate Ledger Tracking
   if (refWallet) {
     const rebateAmount = cost * 0.10;
-    db.prepare('INSERT INTO affiliate_ledger (referrer_wallet, rebate_usdc, source_api_key) VALUES (?, ?, ?)').run(refWallet, rebateAmount, apiKey);
+    db.affiliates.push({ referrerWallet: refWallet, rebateUSDC: rebateAmount, apiKey, timestamp: new Date().toISOString() });
     console.log(`[Affiliate Ledger] Credited ${rebateAmount} USDC rebate to referrer ${refWallet}`);
   }
+
+  saveData();
 
   // Webhook Dispatch
   if (webhookUrl) {
@@ -201,5 +209,5 @@ app.use('*', (req, res) => {
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`x402 Scraper API v3.0 running on 0.0.0.0:${PORT}`);
+  console.log(`x402 Scraper API v3.1 running on 0.0.0.0:${PORT}`);
 });
