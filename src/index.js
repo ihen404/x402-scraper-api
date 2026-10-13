@@ -369,3 +369,11 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`x402 Scraper API v3.2 running on 0.0.0.0:${PORT}`);
   startAutonomousGrowthScout();
 });
+
+// Glama HTTP verification route
+app.get('/.well-known/glama.json', (req, res) => {
+  res.json({
+    "$schema": "https://glama.ai/mcp/schemas/connector.json",
+    "claim": "glama_claim_8yUyS7PcrXDM9X-j2_DMyjK1xrN5hDiZ"
+  });
+});
