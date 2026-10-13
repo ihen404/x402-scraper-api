@@ -36,6 +36,9 @@ const telemetry = {
   startTime: new Date().toISOString(),
   totalRequests: 0,
   mcpToolCalls: 0,
+  mcpToolCallsBasic: 0,
+  mcpToolCallsDynamic: 0,
+  mcpToolCallsStructured: 0,
   x402ChallengesIssued: 0,
   uniqueSessions: new Set()
 };
@@ -543,51 +546,143 @@ app.all("/mcp", (req, res) => {
 
 
 // Static Server Card for Smithery publisher auto-discovery
+
 app.get("/.well-known/mcp/server-card.json", (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.json({
     schemaVersion: "1.0",
     serverInfo: {
       name: "x402-scraper-api",
-      version: "3.4.0",
-      description: "Enterprise web scraping MCP server with automated x402 micro-payment negotiation on Base Mainnet.",
+      version: "3.5.0",
+      description: "Multi-tiered web scraping MCP server with automated x402 micro-payments on Base Mainnet ($0.01 - $0.15 USDC).",
       homepage: "https://github.com/ihen404/x402-scraper-api"
     },
     transport: {
       type: "streamable-http",
       endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
     },
-    capabilities: {
-      tools: true
-    },
+    capabilities: { tools: true },
     tools: [
-      {
-        name: "scrape",
-        description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.01 USDC on Base Mainnet]",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "Target web URL to scrape" }
-          },
-          required: ["url"]
+  {
+    "name": "scrape_basic",
+    "description": "Fast DOM parsing and clean Markdown extraction from static HTML. [x402 Protocol: $0.01 USDC on Base]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Target URL to scrape"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
         },
-        outputSchema: {
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            content: { type: "string", description: "Extracted clean markdown content" },
-            url: { type: "string" }
-          }
+        "content": {
+          "type": "string",
+          "description": "Clean Markdown body text"
         },
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true
+        "url": {
+          "type": "string"
         }
       }
-    ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "scrape_dynamic",
+    "description": "Renders JavaScript-heavy dynamic web pages (SPAs, React apps) using headless browser simulation. [x402 Protocol: $0.05 USDC on Base]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Target URL to render and scrape"
+        },
+        "waitForMs": {
+          "type": "number",
+          "description": "Delay in ms to allow dynamic JS loading (default: 2000)"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "content": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "scrape_structured",
+    "description": "Scrapes a web page and parses raw content directly into a requested JSON schema format. [x402 Protocol: $0.15 USDC on Base]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Target URL to extract structured data from"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "description": "Target JSON Schema object for extraction"
+        }
+      },
+      "required": [
+        "url",
+        "jsonSchema"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "extractedData": {
+          "type": "object",
+          "description": "Extracted data structured according to jsonSchema"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true
+    }
+  }
+]
   });
 });
+
 
 // Also add a root health check so root requests don't 404
 app.get("/", (req, res) => {
