@@ -386,6 +386,7 @@ app.get('/.well-known/glama.json', (req, res) => {
 
 // Streamable HTTP / JSON-RPC endpoint handler for Glama MCP compliance
 app.all("/mcp", (req, res) => {
+  console.log("[Glama Test Log] Method:", req.method, "Headers:", JSON.stringify(req.headers), "Body:", JSON.stringify(req.body));
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
