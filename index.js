@@ -52,6 +52,7 @@ app.use((req, res, next) => {
   next();
 });
 
+
 app.get("/telemetry", (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Content-Type", "application/json");
@@ -60,19 +61,30 @@ app.get("/telemetry", (req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     metrics: {
       totalRequests: telemetry.totalRequests,
-      mcpToolCalls: telemetry.mcpToolCalls,
+      mcpToolCalls: {
+        basic: telemetry.mcpToolCallsBasic || 0,
+        dynamic: telemetry.mcpToolCallsDynamic || 0,
+        structured: telemetry.mcpToolCallsStructured || 0,
+        total: telemetry.mcpToolCalls
+      },
       x402ChallengesIssued: telemetry.x402ChallengesIssued,
       estimatedDailyVelocity: Math.round((telemetry.mcpToolCalls / (process.uptime() || 1)) * 86400),
       activeUniqueSessions: telemetry.uniqueSessions.size,
-      estimatedRevenueUsdc: "$" + (telemetry.mcpToolCalls * 0.01).toFixed(2)
+      estimatedRevenueUsdc: "$" + (
+        ((telemetry.mcpToolCallsBasic || 0) * 0.01) +
+        ((telemetry.mcpToolCallsDynamic || 0) * 0.05) +
+        ((telemetry.mcpToolCallsStructured || 0) * 0.15) +
+        ((telemetry.mcpToolCalls - ((telemetry.mcpToolCallsBasic || 0) + (telemetry.mcpToolCallsDynamic || 0) + (telemetry.mcpToolCallsStructured || 0))) * 0.01)
+      ).toFixed(2)
     },
     serverInfo: {
       name: "x402-scraper-api",
-      version: "3.4.0",
+      version: "3.5.0",
       environment: process.env.NODE_ENV || "production"
     }
   });
 });
+
 
 
 // Telemetry middleware for tracking MCP traffic velocity
