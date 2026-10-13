@@ -436,6 +436,7 @@ app.all("/mcp", (req, res) => {
       return res.status(200).send("");
     }
 
+    
     if (method === "tools/list") {
       return res.json({
         jsonrpc: "2.0",
@@ -443,19 +444,33 @@ app.all("/mcp", (req, res) => {
           tools: [
             {
               name: "scrape",
-              description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.01 USDC on Base]",
+              description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.01 USDC on Base Mainnet]",
               inputSchema: {
                 type: "object",
                 properties: {
                   url: { type: "string", description: "Target web URL to scrape" }
                 },
                 required: ["url"]
+              },
+              outputSchema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean" },
+                  content: { type: "string", description: "Extracted markdown or clean text content" },
+                  url: { type: "string" }
+                }
+              },
+              annotations: {
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true
               }
             }
           ]
         },
         id: id !== undefined ? id : 1
       });
+    }
     }
 
     return res.json({

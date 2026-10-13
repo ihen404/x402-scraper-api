@@ -14,5 +14,19 @@
     "node-cache": "^5.1.2",
     "uuid": "^9.0.1",
     "zod": "^4.6.7"
+  },
+  "description": "Enterprise web scraping MCP server with automated x402 micro-payment negotiation on Base Mainnet.",
+  "homepage": "https://github.com/ihen404/x402-scraper-api",
+  "keywords": [
+    "mcp",
+    "scraping",
+    "x402",
+    "base",
+    "ai-agents",
+    "micropayments"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ihen404/x402-scraper-api.git"
   }
 }
