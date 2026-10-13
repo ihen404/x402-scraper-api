@@ -380,27 +380,57 @@ app.get('/.well-known/glama.json', (req, res) => {
 
 
 
-// Glama MCP Streamable HTTP / JSON-RPC endpoint handler
-app.post("/mcp", (req, res) => {
-  try {
+
+
+// Streamable HTTP / JSON-RPC endpoint handler for Glama MCP compliance
+app.all("/mcp", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // Handle GET SSE Stream initialization
+  if (req.method === "GET") {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.write("event: endpoint
+data: /mcp
+
+");
+    return;
+  }
+
+  // Handle POST JSON-RPC payloads
+  if (req.method === "POST") {
     const body = req.body || {};
-    const method = body.method;
-    const id = body.id || 1;
-    
+    const { method, id } = body;
+
+    // Send Mcp-Session-Id header if requested
+    const sessionId = req.headers["mcp-session-id"] || "x402-session-" + Date.now();
+    res.setHeader("Mcp-Session-Id", sessionId);
+
     if (method === "initialize") {
       return res.json({
         jsonrpc: "2.0",
         result: {
           protocolVersion: "2024-11-05",
-          capabilities: { tools: {} },
+          capabilities: {
+            tools: { listChanged: false },
+            prompts: {},
+            resources: {}
+          },
           serverInfo: { name: "x402-scraper-api", version: "3.3.0" }
         },
-        id
+        id: id || 1
       });
     }
 
     if (method === "notifications/initialized") {
-      return res.json({ jsonrpc: "2.0", result: {}, id: id || null });
+      return res.status(200).send("");
     }
 
     if (method === "tools/list") {
@@ -421,24 +451,17 @@ app.post("/mcp", (req, res) => {
             }
           ]
         },
-        id
+        id: id || 1
       });
     }
 
+    // Default JSON-RPC response
     return res.json({
       jsonrpc: "2.0",
       result: { status: "ok", server: "x402-scraper-api" },
-      id
+      id: id || 1
     });
-  } catch (err) {
-    console.error("[MCP Endpoint Error]", err);
-    return res.status(200).json({ jsonrpc: "2.0", result: { status: "error", message: err.message }, id: 1 });
   }
-});
 
-app.get("/mcp", (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.write("data: " + JSON.stringify({ type: "connection", status: "connected" }) + "\n\n");
+  return res.status(405).json({ error: "Method Not Allowed" });
 });
