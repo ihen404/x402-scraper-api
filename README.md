@@ -1,17 +1,24 @@
-# x402 Scraper API
+# x402-scraper-api
 
-Programmatic web-scraping MCP server powered by x402 micro-transactions on Base.
+An open Model Context Protocol (MCP) server providing web scraping capabilities integrated with x402 dynamic micro-payment discovery ($0.01 USDC per call on Base Mainnet).
 
-## Quick Start for AI Clients (Claude Desktop / Cursor)
-```json
+## Installation for AI Clients
+
+Add this configuration to your `claude_desktop_config.json` or MCP client settings:
+
+\`\`\`json
 {
-  \"mcpServers\": {
-    \"x402-scraper\": {
-      \"transport\": \"streamable-http\",
-      \"url\": \"[https://x402-scraper-api-production-67a4.up.railway.app/mcp](https://x402-scraper-api-production-67a4.up.railway.app/mcp)\"
+  "mcpServers": {
+    "x402-scraper": {
+      "command": "npx",
+      "args": ["-y", "x402-scraper-api"],
+      "env": {
+        "BASE_RPC_URL": "https://mainnet.base.org"
+      }
     }
   }
 }
-```
+\`\`\`
 
-- [x402-scraper-api](https://github.com/ihen404/x402-scraper-api) - High-performance web scraping and text extraction MCP service, fee-gated with on-chain USDC micro-payments on Base.
+## Hosted Streamable HTTP Endpoint
+- **Glama / Smithery Endpoint**: `https://x402-scraper-api-production-67a4.up.railway.app/mcp`
