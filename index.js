@@ -382,6 +382,8 @@ app.get('/.well-known/glama.json', (req, res) => {
 
 
 
+
+
 // Streamable HTTP / JSON-RPC endpoint handler for Glama MCP compliance
 app.all("/mcp", (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -392,24 +394,17 @@ app.all("/mcp", (req, res) => {
     return res.status(200).end();
   }
 
-  // Handle GET SSE Stream initialization
   if (req.method === "GET") {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.write("event: endpoint
-data: /mcp
-
-");
+    res.write("event: endpoint\ndata: /mcp\n\n");
     return;
   }
 
-  // Handle POST JSON-RPC payloads
   if (req.method === "POST") {
     const body = req.body || {};
     const { method, id } = body;
-
-    // Send Mcp-Session-Id header if requested
     const sessionId = req.headers["mcp-session-id"] || "x402-session-" + Date.now();
     res.setHeader("Mcp-Session-Id", sessionId);
 
@@ -418,11 +413,7 @@ data: /mcp
         jsonrpc: "2.0",
         result: {
           protocolVersion: "2024-11-05",
-          capabilities: {
-            tools: { listChanged: false },
-            prompts: {},
-            resources: {}
-          },
+          capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "x402-scraper-api", version: "3.3.0" }
         },
         id: id || 1
@@ -455,7 +446,6 @@ data: /mcp
       });
     }
 
-    // Default JSON-RPC response
     return res.json({
       jsonrpc: "2.0",
       result: { status: "ok", server: "x402-scraper-api" },
