@@ -1,3 +1,12 @@
+
+// Telemetry middleware for tracking MCP traffic velocity
+app.use((req, res, next) => {
+  if (req.path.includes('/mcp')) {
+    console.log(`[Telemetry] ${new Date().toISOString()} | Method: ${req.method} | IP: ${req.ip} | User-Agent: ${req.headers['user-agent']}`);
+  }
+  next();
+});
+
 import express from 'express';
 import NodeCache from 'node-cache';
 import { v4 as uuidv4 } from 'uuid';
