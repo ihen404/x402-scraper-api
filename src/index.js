@@ -762,3 +762,71 @@ async function checkRevenueAlerts(revenue) {
     }
   }
 }
+
+
+// Daily Analytics & Revenue Email Dispatcher
+let lastAlertedRevenue = 0;
+
+async function sendEmailReport(subject, isDaily = false) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const alertEmail = process.env.ALERT_EMAIL || "ikehentrel@gmail.com";
+  if (!apiKey) return;
+
+  const basicCalls = telemetry.mcpToolCallsBasic || 0;
+  const dynamicCalls = telemetry.mcpToolCallsDynamic || 0;
+  const structuredCalls = telemetry.mcpToolCallsStructured || 0;
+  const untrackedCalls = Math.max(0, telemetry.mcpToolCalls - (basicCalls + dynamicCalls + structuredCalls));
+
+  const totalRev = (
+    (basicCalls * 0.01) +
+    (dynamicCalls * 0.05) +
+    (structuredCalls * 0.15) +
+    (untrackedCalls * 0.01)
+  ).toFixed(2);
+
+  const htmlBody = "<div style="font-family: Arial, sans-serif; padding: 20px;">" +
+    "<h2 style="color: #0052FF;">📊 x402 Scraper API " + (isDaily ? "Daily Performance Report" : "Revenue Milestone") + "</h2>" +
+    "<p>Automated telemetry report for <b>Base Mainnet</b>:</p>" +
+    "<table style="width: 100%; max-width: 500px; border-collapse: collapse;">" +
+      "<tr style="background: #f4f4f4;"><th style="padding: 10px;">Metric</th><th style="padding: 10px; text-align: right;">Value</th></tr>" +
+      "<tr><td style="padding: 10px;"><b>Total Estimated Revenue</b></td><td style="padding: 10px; text-align: right; color: #28a745;"><b>$" + totalRev + " USDC</b></td></tr>" +
+      "<tr><td style="padding: 10px;">Total Requests</td><td style="padding: 10px; text-align: right;">" + telemetry.totalRequests + "</td></tr>" +
+      "<tr><td style="padding: 10px;">MCP Tool Invocations</td><td style="padding: 10px; text-align: right;">" + telemetry.mcpToolCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px;">• Basic ($0.01)</td><td style="padding: 10px; text-align: right;">" + basicCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px;">• Dynamic ($0.05)</td><td style="padding: 10px; text-align: right;">" + dynamicCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px;">• Structured ($0.15)</td><td style="padding: 10px; text-align: right;">" + structuredCalls + "</td></tr>" +
+    "</table>" +
+    "<br/><p><a href="https://x402-scraper-api-production-67a4.up.railway.app/telemetry" style="background: #0052FF; color: white; padding: 10px 15px; text-decoration: none;">View Telemetry</a></p>" +
+    "</div>";
+
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "x402 Scraper API <onboarding@resend.dev>",
+        to: alertEmail,
+        subject: subject,
+        html: htmlBody
+      })
+    });
+    console.log("[Email Dispatch] Report sent to " + alertEmail);
+  } catch (err) {
+    console.error("[Email Error]", err);
+  }
+}
+
+async function checkRevenueAlerts(revenue) {
+  const numericRev = parseFloat(revenue);
+  if (numericRev >= lastAlertedRevenue + 5.00) {
+    lastAlertedRevenue = numericRev;
+    await sendEmailReport("🚀 Revenue Milestone: $" + numericRev.toFixed(2) + " USDC Reached!", false);
+  }
+}
+
+setInterval(() => {
+  sendEmailReport("📈 Daily Analytics Report: x402 Scraper API", true);
+}, 24 * 60 * 60 * 1000);
