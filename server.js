@@ -384,9 +384,10 @@ app.get('/.well-known/glama.json', (req, res) => {
 
 
 
+
+
 // Streamable HTTP / JSON-RPC endpoint handler for Glama MCP compliance
 app.all("/mcp", (req, res) => {
-  console.log("[Glama Test Log] Method:", req.method, "Headers:", JSON.stringify(req.headers), "Body:", JSON.stringify(req.body));
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -414,15 +415,11 @@ app.all("/mcp", (req, res) => {
         jsonrpc: "2.0",
         result: {
           protocolVersion: body.params?.protocolVersion || "2025-11-25",
-          capabilities: {
-            tools: { listChanged: false },
-            tasks: { cancel: {}, list: {} }
-          },
+          capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "x402-scraper-api", version: "3.3.0" }
         },
         id: id !== undefined ? id : 1
       });
-    }
     }
 
     if (method === "notifications/initialized") {
