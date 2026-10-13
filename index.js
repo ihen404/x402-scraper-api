@@ -396,7 +396,9 @@ app.get('/.well-known/glama.json', (req, res) => {
 
 
 
-// Streamable HTTP / JSON-RPC endpoint handler for Glama MCP compliance
+
+
+// Streamable HTTP / JSON-RPC endpoint handler for Glama and Smithery compliance
 app.all("/mcp", (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id");
@@ -426,7 +428,7 @@ app.all("/mcp", (req, res) => {
         result: {
           protocolVersion: body.params?.protocolVersion || "2025-11-25",
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "x402-scraper-api", version: "3.3.0" }
+          serverInfo: { name: "x402-scraper-api", version: "3.4.0" }
         },
         id: id !== undefined ? id : 1
       });
@@ -436,7 +438,6 @@ app.all("/mcp", (req, res) => {
       return res.status(200).send("");
     }
 
-    
     if (method === "tools/list") {
       return res.json({
         jsonrpc: "2.0",
@@ -456,7 +457,7 @@ app.all("/mcp", (req, res) => {
                 type: "object",
                 properties: {
                   success: { type: "boolean" },
-                  content: { type: "string", description: "Extracted markdown or clean text content" },
+                  content: { type: "string", description: "Extracted clean markdown content" },
                   url: { type: "string" }
                 }
               },
@@ -471,7 +472,6 @@ app.all("/mcp", (req, res) => {
         id: id !== undefined ? id : 1
       });
     }
-    }
 
     return res.json({
       jsonrpc: "2.0",
@@ -481,16 +481,4 @@ app.all("/mcp", (req, res) => {
   }
 
   return res.status(405).json({ error: "Method Not Allowed" });
-});
-
-
-// Public GET handler for /scrape to return x402 payment instructions
-app.get("/scrape", (req, res) => {
-  res.status(402).json({
-    error: "Payment Required",
-    message: "x402 protocol micro-payment required ($0.01 USDC on Base Mainnet). Please invoke via MCP tool or send a POST request with valid x402 payment authorization headers.",
-    targetUrl: req.query.url || null,
-    network: "Base Mainnet",
-    price: "$0.01 USDC"
-  });
 });
