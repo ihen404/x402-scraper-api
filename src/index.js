@@ -14,6 +14,23 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 
 const app = express();
 
+import rateLimit from "express-rate-limit";
+
+// Shield unpaid challenge spammers: Max 30 requests per minute per IP on /scrape
+const scrapeLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Too many scraping requests/challenges from this IP. Please throttle agent loops or settle pending x402 payments."
+  }
+});
+
+// Apply rate limiter specifically to scraping endpoints
+app.use("/scrape", scrapeLimiter);
+
+
 // Lightweight Telemetry State & Dashboard
 const telemetry = {
   startTime: new Date().toISOString(),
