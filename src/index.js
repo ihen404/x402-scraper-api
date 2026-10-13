@@ -377,3 +377,37 @@ app.get('/.well-known/glama.json', (req, res) => {
     "claim": "glama_claim_8yUyS7PcrXDM9X-j2_DMyjK1xrN5hDiZ"
   });
 });
+
+// Glama MCP Streamable HTTP / SSE endpoint handler
+app.all('/mcp', (req, res) => {
+  if (req.method === 'GET') {
+    // Return SSE stream connection or protocol handshake info
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.write(`data: ${JSON.stringify({ type: "connection", status: "connected", server: "x402-scraper-api" })}\n\n`);
+  } else if (req.method === 'POST') {
+    // Handle incoming MCP JSON-RPC tool calls from Glama
+    res.json({
+      jsonrpc: "2.0",
+      result: {
+        tools: [
+          {
+            name: "scrape",
+            description: "Scrape, parse, and extract clean text content from any public web URL. [x402 Protocol: $0.01 USDC on Base]",
+            inputSchema: {
+              type: "object",
+              properties: {
+                url: { type: "string", description: "Target web URL to scrape" }
+              },
+              required: ["url"]
+            }
+          }
+        ]
+      },
+      id: req.body?.id || 1
+    });
+  } else {
+    res.status(405).send('Method Not Allowed');
+  }
+});
