@@ -1,4 +1,3 @@
-
 import express from 'express';
 import NodeCache from 'node-cache';
 import { v4 as uuidv4 } from 'uuid';
@@ -721,51 +720,12 @@ setInterval(async () => {
 
 
 // Real-time Email Alerting System
-let lastAlertedRevenue = 0;
 
-async function checkRevenueAlerts(revenue) {
-  const numericRev = parseFloat(revenue);
-  const apiKey = process.env.RESEND_API_KEY;
-  const alertEmail = process.env.ALERT_EMAIL || "ikehentrel@gmail.com";
 
-  if (!apiKey) return;
-
-  // Trigger alert every $5.00 in settled revenue milestone
-  if (numericRev >= lastAlertedRevenue + 5.00) {
-    lastAlertedRevenue = numericRev;
-    try {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          from: "x402 Scraper API <alerts@resend.dev>",
-          to: alertEmail,
-          subject: `🚀 Revenue Alert: $${numericRev.toFixed(2)} USDC Milestone Reached!`,
-          html: `
-            <h2>x402 Scraper API Revenue Milestone</h2>
-            <p>Your server has hit a new revenue threshold on Base Mainnet!</p>
-            <ul>
-              <li><b>Total Revenue:</b> $${numericRev.toFixed(2)} USDC</li>
-              <li><b>Total Tool Invocations:</b> ${telemetry.mcpToolCalls}</li>
-              <li><b>Estimated Velocity:</b> ${Math.round((telemetry.mcpToolCalls / (process.uptime() || 1)) * 86400)} req/day</li>
-            </ul>
-            <p><a href="https://x402-scraper-api-production-67a4.up.railway.app/telemetry">View Live Telemetry Dashboard</a></p>
-          `
-        })
-      });
-      console.log("[Email Alert] Milestone notification sent to " + alertEmail);
-    } catch (e) {
-      console.error("[Email Alert Error]", e);
-    }
-  }
+// Daily Analytics & Revenue Email Dispatcher (Resend Integration)
+if (typeof lastAlertedRevenue === "undefined") {
+  var lastAlertedRevenue = 0;
 }
-
-
-// Daily Analytics & Revenue Email Dispatcher
-let lastAlertedRevenue = 0;
 
 async function sendEmailReport(subject, isDaily = false) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -788,15 +748,15 @@ async function sendEmailReport(subject, isDaily = false) {
     "<h2 style="color: #0052FF;">📊 x402 Scraper API " + (isDaily ? "Daily Performance Report" : "Revenue Milestone") + "</h2>" +
     "<p>Automated telemetry report for <b>Base Mainnet</b>:</p>" +
     "<table style="width: 100%; max-width: 500px; border-collapse: collapse;">" +
-      "<tr style="background: #f4f4f4;"><th style="padding: 10px;">Metric</th><th style="padding: 10px; text-align: right;">Value</th></tr>" +
-      "<tr><td style="padding: 10px;"><b>Total Estimated Revenue</b></td><td style="padding: 10px; text-align: right; color: #28a745;"><b>$" + totalRev + " USDC</b></td></tr>" +
-      "<tr><td style="padding: 10px;">Total Requests</td><td style="padding: 10px; text-align: right;">" + telemetry.totalRequests + "</td></tr>" +
-      "<tr><td style="padding: 10px;">MCP Tool Invocations</td><td style="padding: 10px; text-align: right;">" + telemetry.mcpToolCalls + "</td></tr>" +
-      "<tr><td style="padding: 10px;">• Basic ($0.01)</td><td style="padding: 10px; text-align: right;">" + basicCalls + "</td></tr>" +
-      "<tr><td style="padding: 10px;">• Dynamic ($0.05)</td><td style="padding: 10px; text-align: right;">" + dynamicCalls + "</td></tr>" +
-      "<tr><td style="padding: 10px;">• Structured ($0.15)</td><td style="padding: 10px; text-align: right;">" + structuredCalls + "</td></tr>" +
+      "<tr style="background: #f4f4f4;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Metric</th><th style="padding: 10px; border: 1px solid #ddd; text-align: right;">Value</th></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;"><b>Total Estimated Revenue</b></td><td style="padding: 10px; border: 1px solid #ddd; text-align: right; color: #28a745;"><b>$" + totalRev + " USDC</b></td></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;">Total Requests</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">" + telemetry.totalRequests + "</td></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;">MCP Tool Invocations</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">" + telemetry.mcpToolCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;">• Basic ($0.01)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">" + basicCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;">• Dynamic ($0.05)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">" + dynamicCalls + "</td></tr>" +
+      "<tr><td style="padding: 10px; border: 1px solid #ddd;">• Structured ($0.15)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">" + structuredCalls + "</td></tr>" +
     "</table>" +
-    "<br/><p><a href="https://x402-scraper-api-production-67a4.up.railway.app/telemetry" style="background: #0052FF; color: white; padding: 10px 15px; text-decoration: none;">View Telemetry</a></p>" +
+    "<br/><p><a href="https://x402-scraper-api-production-67a4.up.railway.app/telemetry" style="background: #0052FF; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">View Telemetry Dashboard</a></p>" +
     "</div>";
 
   try {
