@@ -413,12 +413,16 @@ app.all("/mcp", (req, res) => {
       return res.json({
         jsonrpc: "2.0",
         result: {
-          protocolVersion: "2024-11-05",
-          capabilities: { tools: { listChanged: false } },
+          protocolVersion: body.params?.protocolVersion || "2025-11-25",
+          capabilities: {
+            tools: { listChanged: false },
+            tasks: { cancel: {}, list: {} }
+          },
           serverInfo: { name: "x402-scraper-api", version: "3.3.0" }
         },
-        id: id || 1
+        id: id !== undefined ? id : 1
       });
+    }
     }
 
     if (method === "notifications/initialized") {
@@ -443,14 +447,14 @@ app.all("/mcp", (req, res) => {
             }
           ]
         },
-        id: id || 1
+        id: id !== undefined ? id : 1
       });
     }
 
     return res.json({
       jsonrpc: "2.0",
       result: { status: "ok", server: "x402-scraper-api" },
-      id: id || 1
+      id: id !== undefined ? id : 1
     });
   }
 
