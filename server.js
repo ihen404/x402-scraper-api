@@ -21,7 +21,7 @@ const activePasses = new Map();
 const mcpCapabilities = {
   protocolVersion: "2024-11-05",
   capabilities: { tools: { listChanged: true } },
-  serverInfo: { name: "x402 Scraper API", version: "4.3.2" },
+  serverInfo: { name: "x402 Scraper API", version: "4.3.3" },
   tools: [
     { name: "scrape_basic", description: "Static HTML extraction ($0.01 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_dynamic", description: "JS-rendered extraction ($0.05 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
@@ -38,7 +38,7 @@ const mcpCapabilities = {
 
 const telemetry = {
   service: "x402 Scraper API",
-  version: "4.3.2",
+  version: "4.3.3",
   networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
   wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
   startedAt: new Date().toISOString(),
@@ -59,7 +59,7 @@ const TIER_PRICES = {
   purchase_pass: 5.00
 };
 
-app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.3.2" }));
+app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.3.3" }));
 app.get('/ping', (req, res) => res.json({ status: "pong" }));
 app.get('/health', (req, res) => res.json({ status: "healthy" }));
 
@@ -90,14 +90,13 @@ app.get('/webhook/buffer/:id', (req, res) => {
 const processMcpRequest = (req, res) => {
   const { method, params, id } = req.body || {};
 
-  // 1. MCP Initialization & Discovery Handshake
   if (!method || method === 'initialize' || method === 'notifications/initialized') {
     return res.status(200).json({
       jsonrpc: "2.0",
       result: {
         protocolVersion: "2024-11-05",
         capabilities: { tools: { listChanged: true } },
-        serverInfo: { name: "x402 Scraper API", version: "4.3.2" }
+        serverInfo: { name: "x402 Scraper API", version: "4.3.3" }
       },
       id: id || 1
     });
@@ -111,17 +110,14 @@ const processMcpRequest = (req, res) => {
     });
   }
 
-  // 2. Tool Execution Logic & Payment Gatekeeping
   if (method === 'tools/call') {
     const toolName = params?.name;
     const args = params?.arguments || {};
     const price = TIER_PRICES[toolName] || 0.01;
     
-    // Check for Glama/Inspector Health Check Probes
     const userAgent = req.headers['user-agent'] || '';
     const isGlamaProbe = req.headers['x-glama-health-check'] || userAgent.includes('Glama') || userAgent.includes('MCP-Inspector');
 
-    // Check for Bearer Subscription Token
     const authHeader = req.headers['authorization'];
     let hasValidPass = false;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -136,8 +132,8 @@ const processMcpRequest = (req, res) => {
 
     const paymentSig = req.headers['payment-signature'] || req.headers['x-payment-proof'];
 
-    // If no payment signature, valid pass, or health check header, return 402
-    if (!hasValidPass && !paymentSig && !isGlamaProbe && toolName !== 'purchase_pass') {
+    // Allow scrape_basic and Glama Probes to complete without 402
+    if (!hasValidPass && !paymentSig && !isGlamaProbe && toolName !== 'purchase_pass' && toolName !== 'scrape_basic') {
       return res.status(402).json({
         jsonrpc: "2.0",
         error: {
@@ -275,7 +271,7 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => {
   res.json({
     name: "x402 Scraper API",
     description: "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification, Cryptographic Proofs, Webhook Relays & 24hr Agent Passes via x402 USDC",
-    version: "4.3.2",
+    version: "4.3.3",
     supportedNetworks: ["eip155:8453", "eip155:42161", "solana:mainnet"],
     endpoints: {
       mcp: "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
@@ -291,4 +287,4 @@ app.get('/llms.txt', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("[x402 Scraper API v4.3.2] Running on port " + PORT));
+app.listen(PORT, () => console.log("[x402 Scraper API v4.3.3] Running on port " + PORT));
