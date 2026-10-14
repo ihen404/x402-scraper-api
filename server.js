@@ -5,7 +5,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Enhanced CORS & Protocol Version Header Middleware
+// Universal CORS & Protocol Headers
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -14,28 +14,6 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
-
-// Verification Claim Endpoint
-app.get('/.well-known/glama.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.json({
-    "$schema": "https://glama.ai/mcp/schemas/connector.json",
-    "maintainers": [{ "email": "ike.hentrel@gmail.com" }]
-  });
-});
-
-// Telemetry State
-const telemetry = {
-  service: "x402 Scraper API",
-  version: "3.5.0",
-  networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
-  wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
-  startedAt: new Date().toISOString(),
-  live_onchain: { totalRequests: 3, successfulScrapes: 3, failureCount: 0, usdcRevenue: 0.03, tiers: { basic: 3, dynamic: 0, structured: 0, cached: 0, batch: 0 } },
-  test_simulation: { totalRequests: 3, successfulScrapes: 3, failureCount: 0, simulatedRevenue: 0.21, tiers: { basic: 1, dynamic: 1, structured: 1 } }
-};
-
-const TIER_PRICES = { scrape_basic: 0.01, scrape_dynamic: 0.05, scrape_structured: 0.15, scrape_cached: 0.0025, scrape_batch: 0.08 };
 
 const mcpCapabilities = {
   protocolVersion: "2024-11-05",
@@ -50,18 +28,32 @@ const mcpCapabilities = {
   ]
 };
 
-// GET /mcp for Glama Streamable HTTP / SSE Probe
-app.get('/mcp', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  return res.json({ jsonrpc: "2.0", result: mcpCapabilities, id: 1 });
-});
+// Health Check & Root Handshake Endpoints for Glama Crawler
+app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", mcp: "/mcp" }));
+app.get('/ping', (req, res) => res.json({ status: "pong" }));
+app.get('/health', (req, res) => res.json({ status: "healthy" }));
+app.get('/.well-known/glama.json', (req, res) => res.json({ "$schema": "https://glama.ai/mcp/schemas/connector.json", "maintainers": [{ "email": "ike.hentrel@gmail.com" }] }));
 
-// POST /mcp Protocol Handshaking
-app.post('/mcp', (req, res, next) => {
+// Telemetry State
+const telemetry = {
+  service: "x402 Scraper API",
+  version: "3.5.0",
+  networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
+  wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+  startedAt: new Date().toISOString(),
+  live_onchain: { totalRequests: 3, successfulScrapes: 3, failureCount: 0, usdcRevenue: 0.03, tiers: { basic: 3, dynamic: 0, structured: 0, cached: 0, batch: 0 } },
+  test_simulation: { totalRequests: 3, successfulScrapes: 3, failureCount: 0, simulatedRevenue: 0.21, tiers: { basic: 1, dynamic: 1, structured: 1 } }
+};
+
+const TIER_PRICES = { scrape_basic: 0.01, scrape_dynamic: 0.05, scrape_structured: 0.15, scrape_cached: 0.0025, scrape_batch: 0.08 };
+
+// Dual Route Handler (/ and /mcp) for MCP JSON-RPC
+const handleMcp = (req, res, next) => {
   const method = req.body?.method;
 
+  // Unconditional 200 OK for ALL discovery/initialization calls
   if (!method || method === 'initialize' || method === 'tools/list' || method === 'ping') {
-    return res.json({ jsonrpc: "2.0", result: mcpCapabilities, id: req.body?.id || 1 });
+    return res.status(200).json({ jsonrpc: "2.0", result: mcpCapabilities, id: req.body?.id || 1 });
   }
 
   const paymentSig = req.headers['payment-signature'] || req.headers['x-payment-proof'];
@@ -80,10 +72,14 @@ app.post('/mcp', (req, res, next) => {
   }
 
   next();
-});
+};
 
-// POST /mcp Tool Call Execution
-app.post('/mcp', (req, res) => {
+app.get('/mcp', (req, res) => res.status(200).json({ jsonrpc: "2.0", result: mcpCapabilities, id: 1 }));
+app.post('/mcp', handleMcp);
+app.post('/', handleMcp);
+
+// Execution Handlers
+const executeTool = (req, res) => {
   const toolName = req.body?.params?.name;
   const args = req.body?.params?.arguments || {};
 
@@ -97,9 +93,12 @@ app.post('/mcp', (req, res) => {
   }
 
   return res.json({ jsonrpc: "2.0", result: { status: "success", url: args.url || "N/A", message: "Standard scrape executed" }, id: req.body?.id || 1 });
-});
+};
 
-// Telemetry & Discovery Routes
+app.post('/mcp', executeTool);
+app.post('/', executeTool);
+
+// Discovery & Telemetry Endpoints
 app.get('/telemetry', (req, res) => res.json({ ...telemetry, timestamp: new Date().toISOString() }));
 
 app.get('/.well-known/mcp/server-card.json', (req, res) => {
