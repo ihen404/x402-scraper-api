@@ -6,7 +6,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// CORS & Protocol Headers
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -16,13 +15,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// In-Memory Webhook Buffer Store
 const webhookStore = new Map();
 
 const mcpCapabilities = {
   protocolVersion: "2024-11-05",
   capabilities: { tools: {} },
-  serverInfo: { name: "x402 Scraper & M2M API Engine", version: "4.1.0" },
+  serverInfo: { name: "x402 Scraper API", version: "4.2.0" },
   tools: [
     { name: "scrape_basic", description: "Static HTML extraction ($0.01 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_dynamic", description: "JS-rendered extraction ($0.05 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
@@ -36,27 +34,14 @@ const mcpCapabilities = {
   ]
 };
 
-// Telemetry State
 const telemetry = {
   service: "x402 Scraper API",
-  version: "4.1.0",
+  version: "4.2.0",
   networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
   wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
   startedAt: new Date().toISOString(),
-  live_onchain: {
-    totalRequests: 0,
-    successfulScrapes: 0,
-    failureCount: 0,
-    usdcRevenue: 0.0,
-    tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 }
-  },
-  test_simulation: {
-    totalRequests: 0,
-    successfulScrapes: 0,
-    failureCount: 0,
-    simulatedRevenue: 0.0,
-    tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 }
-  }
+  live_onchain: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, usdcRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 } },
+  test_simulation: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, simulatedRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 } }
 };
 
 const TIER_PRICES = {
@@ -71,28 +56,25 @@ const TIER_PRICES = {
   webhook_relay: 0.005
 };
 
-// Health & Metadata Endpoints
-app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.1.0" }));
+app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.2.0" }));
 app.get('/ping', (req, res) => res.json({ status: "pong" }));
 app.get('/health', (req, res) => res.json({ status: "healthy" }));
 app.get('/.well-known/glama.json', (req, res) => res.json({ "$schema": "https://glama.ai/mcp/schemas/connector.json", "maintainers": [{ "email": "ike.hentrel@gmail.com" }] }));
 
-// Webhook Endpoints
 app.post('/webhook/buffer/:id', (req, res) => {
   const { id } = req.params;
-  if (!webhookStore.has(id)) return res.status(404).json({ error: "Webhook endpoint expired or invalid" });
+  if (!webhookStore.has(id)) return res.status(404).json({ error: "Webhook expired" });
   const entry = webhookStore.get(id);
-  entry.payloads.push({ receivedAt: new Date().toISOString(), body: req.body, headers: req.headers });
+  entry.payloads.push({ receivedAt: new Date().toISOString(), body: req.body });
   return res.json({ status: "received", bufferLength: entry.payloads.length });
 });
 
 app.get('/webhook/buffer/:id', (req, res) => {
   const { id } = req.params;
-  if (!webhookStore.has(id)) return res.status(404).json({ error: "Webhook endpoint expired or invalid" });
+  if (!webhookStore.has(id)) return res.status(404).json({ error: "Webhook expired" });
   return res.json(webhookStore.get(id));
 });
 
-// JSON-RPC & MCP Request Dispatcher
 const processMcpRequest = (req, res) => {
   const { method, params, id } = req.body || {};
 
@@ -106,7 +88,6 @@ const processMcpRequest = (req, res) => {
     const price = TIER_PRICES[toolName] || 0.01;
     const paymentSig = req.headers['payment-signature'] || req.headers['x-payment-proof'];
 
-    // Update Telemetry Metrics
     const channel = paymentSig ? telemetry.live_onchain : telemetry.test_simulation;
     channel.totalRequests++;
     channel.successfulScrapes++;
@@ -114,13 +95,8 @@ const processMcpRequest = (req, res) => {
     else channel.simulatedRevenue += price;
 
     const tierKey = toolName ? toolName.replace('scrape_', '') : 'basic';
-    if (channel.tiers[tierKey] !== undefined) {
-      channel.tiers[tierKey]++;
-    } else if (channel.tiers[toolName] !== undefined) {
-      channel.tiers[toolName]++;
-    }
+    if (channel.tiers[tierKey] !== undefined) channel.tiers[tierKey]++;
 
-    // Explicit Tool Handlers
     if (toolName === 'scrape_token_minified') {
       return res.json({
         jsonrpc: "2.0",
@@ -129,9 +105,7 @@ const processMcpRequest = (req, res) => {
           rawTokensEstimate: 4500,
           minifiedTokensEstimate: 380,
           compressionRatio: "91.5%",
-          minifiedMarkdown: "# Token-Minified Content
-
-Main content extracted without nav/footer overhead."
+          minifiedMarkdown: "# Token-Minified Content\n\nMain content extracted without nav/footer overhead."
         },
         id: id || 1
       });
@@ -153,7 +127,7 @@ Main content extracted without nav/footer overhead."
     if (toolName === 'scrape_proof') {
       const timestamp = new Date().toISOString();
       const targetUrl = args.url || "https://example.com";
-      const rawPayload = `Content extracted from ${targetUrl} at ${timestamp}`;
+      const rawPayload = "Content extracted from " + targetUrl + " at " + timestamp;
       const hash = crypto.createHash('sha256').update(rawPayload).digest('hex');
       const signature = crypto.createHmac('sha256', 'x402-verifier-key').update(hash).digest('hex');
 
@@ -179,21 +153,20 @@ Main content extracted without nav/footer overhead."
         jsonrpc: "2.0",
         result: {
           webhookId,
-          callbackUrl: `https://x402-scraper-api-production-67a4.up.railway.app/webhook/buffer/${webhookId}`,
-          fetchBufferUrl: `https://x402-scraper-api-production-67a4.up.railway.app/webhook/buffer/${webhookId}`,
+          callbackUrl: "https://x402-scraper-api-production-67a4.up.railway.app/webhook/buffer/" + webhookId,
+          fetchBufferUrl: "https://x402-scraper-api-production-67a4.up.railway.app/webhook/buffer/" + webhookId,
           expiresInSeconds: ttl
         },
         id: id || 1
       });
     }
 
-    // Default Fallback for Basic Tiers
     return res.json({
       jsonrpc: "2.0",
       result: {
         status: "success",
         url: args.url || "N/A",
-        message: `Execution completed for tier: ${toolName || 'scrape_basic'}`
+        message: "Execution completed for tier: " + (toolName || 'scrape_basic')
       },
       id: id || 1
     });
@@ -212,7 +185,7 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => {
   res.json({
     name: "x402 Scraper API",
     description: "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification, Cryptographic Proofs & Webhook Relays via x402 USDC micro-payments",
-    version: "4.1.0",
+    version: "4.2.0",
     supportedNetworks: ["eip155:8453", "eip155:42161", "solana:mainnet"],
     endpoints: {
       mcp: "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
@@ -224,11 +197,8 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => {
 
 app.get('/llms.txt', (req, res) => {
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-  res.send('# x402 Scraper API
-
-> Complete M2M platform offering web scraping, token minification, residential stealth proxies, cryptographic proofs, and async webhook relays via x402 USDC payment headers.
-');
+  res.send('# x402 Scraper API\n\n> Complete M2M platform offering web scraping, token minification, residential stealth proxies, cryptographic proofs, and async webhook relays via x402 USDC payment headers.\n');
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`[x402 Scraper API v4.1.0] Running on port ${PORT}`));
+app.listen(PORT, () => console.log("[x402 Scraper API v4.2.0] Running on port " + PORT));
