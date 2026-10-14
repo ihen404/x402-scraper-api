@@ -2,7 +2,26 @@ import express from 'express';
 import cors from 'cors';
 
 const app = express();
+
+// Glama Registry Ownership Verification Endpoint
+app.get('/.well-known/glama.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    "$schema": "https://glama.ai/mcp/schemas/connector.json",
+    "maintainers": [{ "email": "ike.hentrel@gmail.com" }]
+  });
+});
+
 app.use(cors());
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 app.use(express.json());
 
 // Multi-Chain & Dual-Channel Telemetry State
