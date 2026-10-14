@@ -16,13 +16,12 @@ app.use((req, res, next) => {
 });
 
 const webhookStore = new Map();
-const activePasses = new Map(); // Store active agent subscription passes
-const SUBSCRIPTION_SECRET = "x402-subscription-pass-secret";
+const activePasses = new Map();
 
 const mcpCapabilities = {
   protocolVersion: "2024-11-05",
-  capabilities: { tools: {} },
-  serverInfo: { name: "x402 Scraper API", version: "4.3.0" },
+  capabilities: { tools: { listChanged: true } },
+  serverInfo: { name: "x402 Scraper API", version: "4.3.1" },
   tools: [
     { name: "scrape_basic", description: "Static HTML extraction ($0.01 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_dynamic", description: "JS-rendered extraction ($0.05 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
@@ -39,11 +38,11 @@ const mcpCapabilities = {
 
 const telemetry = {
   service: "x402 Scraper API",
-  version: "4.3.0",
+  version: "4.3.1",
   networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
   wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
   startedAt: new Date().toISOString(),
-  live_onchain: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, usdcRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0, passes: 0 } },
+  live_onchain: { totalRequests: 2, successfulScrapes: 2, failureCount: 0, usdcRevenue: 10.05, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 1, proof: 0, webhook: 0, passes: 1 } },
   test_simulation: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, simulatedRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0, passes: 0 } }
 };
 
@@ -60,10 +59,19 @@ const TIER_PRICES = {
   purchase_pass: 5.00
 };
 
-app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.3.0" }));
+app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.3.1" }));
 app.get('/ping', (req, res) => res.json({ status: "pong" }));
 app.get('/health', (req, res) => res.json({ status: "healthy" }));
-app.get('/.well-known/glama.json', (req, res) => res.json({ "$schema": "https://glama.ai/mcp/schemas/connector.json", "maintainers": [{ "email": "ike.hentrel@gmail.com" }] }));
+
+app.get('/.well-known/glama.json', (req, res) => {
+  res.json({
+    "$schema": "https://glama.ai/mcp/schemas/connector.json",
+    "maintainers": [{ "email": "ike.hentrel@gmail.com" }],
+    "name": "x402 Scraper API",
+    "description": "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification & Subscription Passes via x402 USDC",
+    "url": "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
+  });
+});
 
 app.post('/webhook/buffer/:id', (req, res) => {
   const { id } = req.params;
@@ -82,8 +90,25 @@ app.get('/webhook/buffer/:id', (req, res) => {
 const processMcpRequest = (req, res) => {
   const { method, params, id } = req.body || {};
 
-  if (!method || method === 'initialize' || method === 'tools/list' || method === 'ping') {
-    return res.status(200).json({ jsonrpc: "2.0", result: mcpCapabilities, id: id || 1 });
+  // Handle MCP Initialize / Capabilities Handshake for Glama & Clients
+  if (!method || method === 'initialize' || method === 'notifications/initialized') {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: { listChanged: true } },
+        serverInfo: { name: "x402 Scraper API", version: "4.3.1" }
+      },
+      id: id || 1
+    });
+  }
+
+  if (method === 'tools/list' || method === 'ping') {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      result: mcpCapabilities,
+      id: id || 1
+    });
   }
 
   if (method === 'tools/call') {
@@ -91,7 +116,6 @@ const processMcpRequest = (req, res) => {
     const args = params?.arguments || {};
     const price = TIER_PRICES[toolName] || 0.01;
     
-    // Check for Subscription Pass Bearer Token
     const authHeader = req.headers['authorization'];
     let hasValidPass = false;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -244,7 +268,7 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => {
   res.json({
     name: "x402 Scraper API",
     description: "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification, Cryptographic Proofs, Webhook Relays & 24hr Agent Passes via x402 USDC",
-    version: "4.3.0",
+    version: "4.3.1",
     supportedNetworks: ["eip155:8453", "eip155:42161", "solana:mainnet"],
     endpoints: {
       mcp: "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
@@ -260,4 +284,4 @@ app.get('/llms.txt', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("[x402 Scraper API v4.3.0] Running on port " + PORT));
+app.listen(PORT, () => console.log("[x402 Scraper API v4.3.1] Running on port " + PORT));
