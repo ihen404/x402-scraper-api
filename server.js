@@ -16,11 +16,13 @@ app.use((req, res, next) => {
 });
 
 const webhookStore = new Map();
+const activePasses = new Map(); // Store active agent subscription passes
+const SUBSCRIPTION_SECRET = "x402-subscription-pass-secret";
 
 const mcpCapabilities = {
   protocolVersion: "2024-11-05",
   capabilities: { tools: {} },
-  serverInfo: { name: "x402 Scraper API", version: "4.2.0" },
+  serverInfo: { name: "x402 Scraper API", version: "4.3.0" },
   tools: [
     { name: "scrape_basic", description: "Static HTML extraction ($0.01 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_dynamic", description: "JS-rendered extraction ($0.05 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
@@ -30,18 +32,19 @@ const mcpCapabilities = {
     { name: "scrape_token_minified", description: "Token-optimized Markdown compression ($0.0025 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_stealth", description: "Residential proxy anti-bot bypass extraction ($0.05 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
     { name: "scrape_proof", description: "Cryptographically signed SHA-256 proof ($0.02 USDC)", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
-    { name: "webhook_relay", description: "Provision temporary async webhook buffer ($0.005 USDC)", inputSchema: { type: "object", properties: { ttlSeconds: { type: "number" } } } }
+    { name: "webhook_relay", description: "Provision temporary async webhook buffer ($0.005 USDC)", inputSchema: { type: "object", properties: { ttlSeconds: { type: "number" } } } },
+    { name: "purchase_pass", description: "Purchase 24-Hour Unlimited Agent Subscription Pass ($5.00 USDC)", inputSchema: { type: "object", properties: { agentWallet: { type: "string" } }, required: ["agentWallet"] } }
   ]
 };
 
 const telemetry = {
   service: "x402 Scraper API",
-  version: "4.2.0",
+  version: "4.3.0",
   networks: { base: "eip155:8453", arbitrum: "eip155:42161", solana: "solana:mainnet" },
   wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
   startedAt: new Date().toISOString(),
-  live_onchain: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, usdcRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 } },
-  test_simulation: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, simulatedRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0 } }
+  live_onchain: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, usdcRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0, passes: 0 } },
+  test_simulation: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, simulatedRevenue: 0.0, tiers: { basic: 0, dynamic: 0, structured: 0, cached: 0, batch: 0, token_minified: 0, stealth: 0, proof: 0, webhook: 0, passes: 0 } }
 };
 
 const TIER_PRICES = {
@@ -53,10 +56,11 @@ const TIER_PRICES = {
   scrape_token_minified: 0.0025,
   scrape_stealth: 0.05,
   scrape_proof: 0.02,
-  webhook_relay: 0.005
+  webhook_relay: 0.005,
+  purchase_pass: 5.00
 };
 
-app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.2.0" }));
+app.get('/', (req, res) => res.json({ status: "healthy", service: "x402 Scraper API", version: "4.3.0" }));
 app.get('/ping', (req, res) => res.json({ status: "pong" }));
 app.get('/health', (req, res) => res.json({ status: "healthy" }));
 app.get('/.well-known/glama.json', (req, res) => res.json({ "$schema": "https://glama.ai/mcp/schemas/connector.json", "maintainers": [{ "email": "ike.hentrel@gmail.com" }] }));
@@ -86,16 +90,71 @@ const processMcpRequest = (req, res) => {
     const toolName = params?.name;
     const args = params?.arguments || {};
     const price = TIER_PRICES[toolName] || 0.01;
+    
+    // Check for Subscription Pass Bearer Token
+    const authHeader = req.headers['authorization'];
+    let hasValidPass = false;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (activePasses.has(token)) {
+        const passData = activePasses.get(token);
+        if (new Date() < new Date(passData.expiresAt)) {
+          hasValidPass = true;
+        }
+      }
+    }
+
     const paymentSig = req.headers['payment-signature'] || req.headers['x-payment-proof'];
+
+    if (!hasValidPass && !paymentSig && toolName !== 'purchase_pass') {
+      return res.status(402).json({
+        jsonrpc: "2.0",
+        error: {
+          code: 402,
+          message: "Payment Required. Provide Payment-Signature header or active Bearer subscription pass.",
+          paymentInfo: {
+            wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+            networks: ["eip155:8453", "eip155:42161", "solana:mainnet"],
+            costUsdc: price,
+            subscriptionPassCostUsdc: 5.00
+          }
+        },
+        id: id || 1
+      });
+    }
 
     const channel = paymentSig ? telemetry.live_onchain : telemetry.test_simulation;
     channel.totalRequests++;
     channel.successfulScrapes++;
-    if (paymentSig) channel.usdcRevenue += price;
-    else channel.simulatedRevenue += price;
+    if (paymentSig || hasValidPass) {
+      if (paymentSig) channel.usdcRevenue += price;
+    } else {
+      channel.simulatedRevenue += price;
+    }
 
     const tierKey = toolName ? toolName.replace('scrape_', '') : 'basic';
     if (channel.tiers[tierKey] !== undefined) channel.tiers[tierKey]++;
+
+    if (toolName === 'purchase_pass') {
+      const passId = "pass_" + crypto.randomBytes(12).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      activePasses.set(passId, { agentWallet: args.agentWallet || "anonymous", expiresAt });
+      
+      channel.tiers.passes = (channel.tiers.passes || 0) + 1;
+      if (paymentSig) channel.usdcRevenue += 5.00;
+
+      return res.json({
+        jsonrpc: "2.0",
+        result: {
+          status: "SUCCESS_PASS_ISSUED",
+          subscriptionPassToken: passId,
+          durationHours: 24,
+          expiresAt,
+          usageInstructions: "Include header 'Authorization: Bearer <passId>' on all future requests for unlimited access."
+        },
+        id: id || 1
+      });
+    }
 
     if (toolName === 'scrape_token_minified') {
       return res.json({
@@ -184,8 +243,8 @@ app.get('/telemetry', (req, res) => res.json({ ...telemetry, timestamp: new Date
 app.get('/.well-known/mcp/server-card.json', (req, res) => {
   res.json({
     name: "x402 Scraper API",
-    description: "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification, Cryptographic Proofs & Webhook Relays via x402 USDC micro-payments",
-    version: "4.2.0",
+    description: "Multi-Tiered Web Scraping, Stealth Proxy, Token Minification, Cryptographic Proofs, Webhook Relays & 24hr Agent Passes via x402 USDC",
+    version: "4.3.0",
     supportedNetworks: ["eip155:8453", "eip155:42161", "solana:mainnet"],
     endpoints: {
       mcp: "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
@@ -197,8 +256,8 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => {
 
 app.get('/llms.txt', (req, res) => {
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-  res.send('# x402 Scraper API\n\n> Complete M2M platform offering web scraping, token minification, residential stealth proxies, cryptographic proofs, and async webhook relays via x402 USDC payment headers.\n');
+  res.send('# x402 Scraper API\n\n> Complete M2M platform offering web scraping, token minification, residential stealth proxies, cryptographic proofs, async webhook relays, and 24-Hour Unlimited Agent Passes via x402 USDC payment headers.\n');
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("[x402 Scraper API v4.2.0] Running on port " + PORT));
+app.listen(PORT, () => console.log("[x402 Scraper API v4.3.0] Running on port " + PORT));
