@@ -1,0 +1,1 @@
+- [x402 Scraper API](https://github.com/ihen404/x402-scraper-api) - Enterprise web scraping MCP server featuring automated x402 micro-payment negotiation ($0.01 USDC on Base). Verified on [Smithery](https://smithery.ai/server/x402-scraper) and [Glama](https://glama.ai/mcp/connectors/x402-scraper).

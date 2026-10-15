@@ -1,0 +1,23 @@
+# x402 Scraper Python Client
+
+Universal M2M Client for x402 Scraper API supporting **Base**, **Arbitrum**, and **Solana**.
+
+## Installation
+
+```bash
+pip install x402-scraper
+```
+
+## Quick Start
+
+```python
+from x402_scraper import X402ScraperClient
+
+client = X402ScraperClient(
+    preferred_chain="eip155:8453",
+    payment_signature="your_x402_payment_signature"
+)
+
+result = client.scrape_token_minified("https://news.ycombinator.com", max_tokens=500)
+print(result)
+```

@@ -1,0 +1,11 @@
+{
+  "name": "x402-scraper-api",
+  "description": "Enterprise-grade web scraping Model Context Protocol (MCP) server with automated x402 micro-payment negotiation ($0.01 USDC on Base Mainnet).",
+  "registries": {
+    "smithery": "https://smithery.ai/server/x402-scraper",
+    "glama": "https://glama.ai/mcp/connectors/x402-scraper"
+  },
+  "transport": "Streamable HTTP / SSE",
+  "endpoint": "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
+  "pricing": "$0.01 USDC per scrape call (Base Mainnet)"
+}

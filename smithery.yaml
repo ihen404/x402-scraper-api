@@ -1,10 +1,16 @@
-deployment:
+startCommand:
   type: http
-  endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
-  configSchema:
-    type: object
-    properties:
-      apiKey:
-        type: string
-        description: "Optional API Key for x402 scraper access"
-    required: []
+  url: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
+configSchema:
+  type: object
+  properties:
+    paymentSignature:
+      type: string
+      description: "x402 Payment-Signature or 24-hour subscription pass token"
+      x-from:
+        header: "Payment-Signature"
+    preferredChain:
+      type: string
+      default: "eip155:8453"
+      enum: ["eip155:8453", "eip155:42161", "solana:mainnet"]
+      description: "Settlement network for x402 micro-settlements (Base, Arbitrum, Solana)"

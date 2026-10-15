@@ -1,255 +1,52 @@
-import express from "express";
-import rateLimit from "express-rate-limit";
+/**
+ * @ihentrel/x402-scraper-client
+ * Universal M2M Client for x402 Scraper API
+ */
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+export class X402ScraperClient {
+  constructor(options = {}) {
+    this.endpoint = options.endpoint || "https://x402-scraper-api-production-67a4.up.railway.app/mcp";
+    this.paymentSignature = options.paymentSignature || null;
+    this.preferredChain = options.preferredChain || "eip155:8453"; // Default: Base Mainnet
+  }
 
-app.use(express.json());
+  async callTool(name, args = {}) {
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Settlement-Chain": this.preferredChain
+    };
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: "Too many requests, please try again later." }
-});
-app.use(limiter);
-
-const telemetry = {
-  totalRequests: 0,
-  mcpToolCalls: 0,
-  mcpToolCallsBasic: 0,
-  mcpToolCallsDynamic: 0,
-  mcpToolCallsStructured: 0,
-  x402ChallengesIssued: 0,
-  uniqueSessions: new Set()
-};
-
-let lastAlertedRevenue = 0;
-
-app.use((req, res, next) => {
-  telemetry.totalRequests++;
-  const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  if (clientIp) telemetry.uniqueSessions.add(clientIp);
-  next();
-});
-
-app.get("/", (req, res) => {
-  res.json({
-    name: "x402-scraper-api",
-    version: "3.5.0",
-    status: "online",
-    docs: "https://github.com/ihen404/x402-scraper-api"
-  });
-});
-
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
-});
-
-app.get("/.well-known/mcp/server-card.json", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.json({
-    schemaVersion: "1.0",
-    serverInfo: {
-      name: "x402-scraper-api",
-      version: "3.5.0",
-      description: "Multi-tiered web scraping MCP server with automated x402 micro-payments on Base Mainnet ($0.01 - $0.15 USDC).",
-      homepage: "https://github.com/ihen404/x402-scraper-api"
-    },
-    transport: {
-      type: "streamable-http",
-      endpoint: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
-    },
-    capabilities: { tools: true },
-    tools: [
-      {
-        name: "scrape_basic",
-        description: "Fast DOM parsing and clean Markdown extraction from static HTML. [x402 Protocol: $0.01 USDC on Base]",
-        inputSchema: {
-          type: "object",
-          properties: { url: { type: "string", description: "Target URL to scrape" } },
-          required: ["url"]
-        },
-        outputSchema: {
-          type: "object",
-          properties: { success: { type: "boolean" }, content: { type: "string" }, url: { type: "string" } }
-        },
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
-      },
-      {
-        name: "scrape_dynamic",
-        description: "Renders JavaScript-heavy dynamic web pages using headless browser simulation. [x402 Protocol: $0.05 USDC on Base]",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "Target URL to render and scrape" },
-            waitForMs: { type: "number", description: "Delay in ms (default: 2000)" }
-          },
-          required: ["url"]
-        },
-        outputSchema: {
-          type: "object",
-          properties: { success: { type: "boolean" }, content: { type: "string" }, url: { type: "string" } }
-        },
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
-      },
-      {
-        name: "scrape_structured",
-        description: "Scrapes a web page and parses raw content directly into a requested JSON schema format. [x402 Protocol: $0.15 USDC on Base]",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "Target URL to extract structured data from" },
-            jsonSchema: { type: "object", description: "Target JSON Schema object for extraction" }
-          },
-          required: ["url", "jsonSchema"]
-        },
-        outputSchema: {
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            extractedData: { type: "object" },
-            url: { type: "string" }
-          }
-        },
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true }
-      }
-    ]
-  });
-});
-
-app.get("/telemetry", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Content-Type", "application/json");
-
-  const basic = telemetry.mcpToolCallsBasic || 0;
-  const dynamic = telemetry.mcpToolCallsDynamic || 0;
-  const structured = telemetry.mcpToolCallsStructured || 0;
-  const totalCalls = telemetry.mcpToolCalls || 0;
-  const untracked = Math.max(0, totalCalls - (basic + dynamic + structured));
-  const totalRevNum = (basic * 0.01) + (dynamic * 0.05) + (structured * 0.15) + (untracked * 0.01);
-
-  return res.json({
-    status: "healthy",
-    uptimeSeconds: Math.floor(process.uptime()),
-    metrics: {
-      totalRequests: telemetry.totalRequests,
-      mcpToolCalls: { basic, dynamic, structured, total: totalCalls },
-      x402ChallengesIssued: telemetry.x402ChallengesIssued,
-      estimatedDailyVelocity: Math.round((totalCalls / (process.uptime() || 1)) * 86400),
-      activeUniqueSessions: telemetry.uniqueSessions.size,
-      estimatedRevenueUsdc: "$" + totalRevNum.toFixed(2)
-    },
-    serverInfo: {
-      name: "x402-scraper-api",
-      version: "3.5.0",
-      environment: process.env.NODE_ENV || "production"
+    if (this.paymentSignature) {
+      headers["Payment-Signature"] = this.paymentSignature;
     }
-  });
-});
 
-async function sendEmailReport(subject, isDaily = false) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const alertEmail = process.env.ALERT_EMAIL || "ikehentrel@gmail.com";
-  if (!apiKey) return;
-
-  const basicCalls = telemetry.mcpToolCallsBasic || 0;
-  const dynamicCalls = telemetry.mcpToolCallsDynamic || 0;
-  const structuredCalls = telemetry.mcpToolCallsStructured || 0;
-  const totalCalls = telemetry.mcpToolCalls || 0;
-  const untrackedCalls = Math.max(0, totalCalls - (basicCalls + dynamicCalls + structuredCalls));
-  const totalRev = ((basicCalls * 0.01) + (dynamicCalls * 0.05) + (structuredCalls * 0.15) + (untrackedCalls * 0.01)).toFixed(2);
-
-  const htmlBody = `<div style="font-family: Arial, sans-serif; padding: 20px;">
-    <h2 style="color: #0052FF;">📊 x402 Scraper API ${isDaily ? "Daily Performance Report" : "Revenue Milestone"}</h2>
-    <p>Automated telemetry report for <b>Base Mainnet</b>:</p>
-    <table style="width: 100%; max-width: 500px; border-collapse: collapse;">
-      <tr style="background: #f4f4f4;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Metric</th><th style="padding: 10px; border: 1px solid #ddd; text-align: right;">Value</th></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;"><b>Total Estimated Revenue</b></td><td style="padding: 10px; border: 1px solid #ddd; text-align: right; color: #28a745;"><b>$${totalRev} USDC</b></td></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;">Total Requests</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${telemetry.totalRequests}</td></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;">MCP Tool Invocations</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${totalCalls}</td></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;">• Basic ($0.01)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${basicCalls}</td></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;">• Dynamic ($0.05)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${dynamicCalls}</td></tr>
-      <tr><td style="padding: 10px; border: 1px solid #ddd;">• Structured ($0.15)</td><td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${structuredCalls}</td></tr>
-    </table>
-    <br/><p><a href="https://x402-scraper-api-production-67a4.up.railway.app/telemetry" style="background: #0052FF; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">View Telemetry Dashboard</a></p>
-  </div>`;
-
-  try {
-    await fetch("https://api.resend.com/emails", {
+    const response = await fetch(this.endpoint, {
       method: "POST",
-      headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "x402 Scraper API <onboarding@resend.dev>", to: alertEmail, subject, html: htmlBody })
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name, arguments: args },
+        id: Date.now()
+      })
     });
-    console.log("[Email Dispatch] Report sent to " + alertEmail);
-  } catch (err) {
-    console.error("[Email Error]", err);
+
+    return await response.json();
+  }
+
+  /**
+   * Scrape and minify HTML to save 80-90% on LLM context tokens.
+   */
+  async scrapeTokenMinified(url, maxTokens = 1000) {
+    return this.callTool("scrape_token_minified", { url, maxTokens });
+  }
+
+  /**
+   * Acquire 24-hour unlimited pass for high-frequency agent crawlers ($5.00 USDC).
+   */
+  async purchasePass() {
+    return this.callTool("purchase_pass", { durationHours: 24, tier: "unlimited_swarm" });
   }
 }
 
-setInterval(() => {
-  sendEmailReport("📈 Daily Analytics Report: x402 Scraper API", true);
-}, 24 * 60 * 60 * 1000);
-
-setInterval(() => {
-  fetch("https://x402-scraper-api-production-67a4.up.railway.app/health").catch(() => {});
-}, 4 * 60 * 1000);
-
-
-
-// MCP JSON-RPC Tool Execution Handler
-app.post("/mcp", async (req, res) => {
-  const { jsonrpc, method, params, id } = req.body;
-
-  if (method === "tools/list") {
-    return res.json({
-      jsonrpc: "2.0",
-      result: {
-        tools: [
-          { name: "scrape_basic", description: "Fast DOM parsing and clean Markdown extraction ($0.01 USDC)" },
-          { name: "scrape_dynamic", description: "Headless browser JS rendering and extraction ($0.05 USDC)" },
-          { name: "scrape_structured", description: "Structured JSON schema extraction ($0.15 USDC)" }
-        ]
-      },
-      id
-    });
-  }
-
-  if (method === "tools/call") {
-    const toolName = params?.name;
-    const args = params?.arguments || {};
-
-    // Update Telemetry Counters
-    telemetry.mcpToolCalls++;
-    if (toolName === "scrape_basic") telemetry.mcpToolCallsBasic = (telemetry.mcpToolCallsBasic || 0) + 1;
-    if (toolName === "scrape_dynamic") telemetry.mcpToolCallsDynamic = (telemetry.mcpToolCallsDynamic || 0) + 1;
-    if (toolName === "scrape_structured") telemetry.mcpToolCallsStructured = (telemetry.mcpToolCallsStructured || 0) + 1;
-
-    // Check revenue milestones
-    const basic = telemetry.mcpToolCallsBasic || 0;
-    const dynamic = telemetry.mcpToolCallsDynamic || 0;
-    const structured = telemetry.mcpToolCallsStructured || 0;
-    const currentRev = (basic * 0.01 + dynamic * 0.05 + structured * 0.15).toFixed(2);
-    if (typeof checkRevenueAlerts === "function") {
-      checkRevenueAlerts(currentRev);
-    }
-
-    let resultData = { success: true, url: args.url, content: "Simulated scraped content from " + args.url };
-    if (toolName === "scrape_structured") {
-      resultData = { success: true, url: args.url, extractedData: { parsed: true, sample: "Structured schema data" } };
-    }
-
-    return res.json({
-      jsonrpc: "2.0",
-      result: {
-        content: [{ type: "text", text: JSON.stringify(resultData, null, 2) }]
-      },
-      id
-    });
-  }
-
-  res.status(400).json({ jsonrpc: "2.0", error: { code: -32601, message: "Method not found" }, id: id || null });
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[Server] x402-scraper-api listening on 0.0.0.0:${PORT}`);
-});
+export default X402ScraperClient;

@@ -1,0 +1,27 @@
+{
+  "name": "x402-scraper-client",
+  "version": "1.0.0",
+  "description": "High-efficiency, token-minified x402 scraper client for AI agents and autonomous swarms supporting Base, Arbitrum, and Solana.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "x402",
+    "mcp",
+    "agent-tools",
+    "web-scraper",
+    "base",
+    "solana",
+    "arbitrum",
+    "usdc",
+    "token-minification"
+  ],
+  "author": "Ike Ambrose Hentrel II",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ihentrel/x402-scraper-api.git"
+  }
+}

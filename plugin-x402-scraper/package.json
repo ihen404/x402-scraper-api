@@ -1,0 +1,8 @@
+{
+  "name": "@x402/elizaos-plugin-scraper",
+  "version": "1.0.0",
+  "description": "Native x402 web scraping plugin for ElizaOS agents on Base Mainnet",
+  "main": "src/index.js",
+  "type": "module",
+  "keywords": ["elizaos", "plugin", "x402", "base", "scraper", "mcp"]
+}

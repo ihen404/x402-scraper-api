@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+x402_scraper/__init__.py
+x402_scraper.egg-info/PKG-INFO
+x402_scraper.egg-info/SOURCES.txt
+x402_scraper.egg-info/dependency_links.txt
+x402_scraper.egg-info/requires.txt
+x402_scraper.egg-info/top_level.txt

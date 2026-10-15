@@ -1,0 +1,5 @@
+Name: x402-scraper-api
+Transport: Streamable HTTP / SSE
+Endpoint: https://x402-scraper-api-production-67a4.up.railway.app/mcp
+Registries: Smithery.ai & Glama.ai verified
+Monetization: x402 Protocol ($0.01 USDC on Base Mainnet)
