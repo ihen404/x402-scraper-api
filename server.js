@@ -10,6 +10,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
 
+console.log('🚀 Initializing'); process.stdout.write(''); // Force flush
 console.log('🚀 Initializing x402-scraper-api on port:', PORT);
 
 function handleProof(req, res) {
