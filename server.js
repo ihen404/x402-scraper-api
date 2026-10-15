@@ -7,7 +7,7 @@ import crypto from 'crypto';
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
 
 console.log('🚀 Initializing'); process.stdout.write(''); // Force flush
