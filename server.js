@@ -1,4 +1,5 @@
 console.log('[BOOT] Starting server.js process...');
+console.log('[BOOT] Starting server.js process...');
 
   process.on("uncaughtException", (err) => {
     console.error("UNCAUGHT EXCEPTION:", err);
