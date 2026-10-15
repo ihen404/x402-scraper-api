@@ -1,0 +1,22 @@
+name: Autonomous Seeder Backup Trigger
+
+on:
+  schedule:
+    # Runs every 6 hours as a backup traffic seeder
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-swarm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Run Swarm Seeding Cycle
+        run: node swarm-client.js

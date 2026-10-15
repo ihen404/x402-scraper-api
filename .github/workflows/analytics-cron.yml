@@ -1,17 +1,33 @@
-name: Daily Analytics Cron
+name: Daily Telemetry & Revenue Reporting
 
 on:
   schedule:
-    # Runs every day at 7:00 AM EST (12:00 UTC)
-    - cron: '0 12 * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+    # Runs at 00:00 UTC every day
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
-  trigger-analytics:
+  run-telemetry:
     runs-on: ubuntu-latest
     steps:
-      - name: Hit Analytics Endpoint
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Execute Telemetry Collector
+        run: node scripts/collect-telemetry.js
+
+      - name: Commit and Push Report
         run: |
-          curl -X POST https://x402-scraper-api-production-67a4.up.railway.app/api/internal/send-analytics \
-            -H "Content-Type: application/json" \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+          git config --global user.name "x402-telemetry-bot"
+          git config --global user.email "bot@x402-scraper.internal"
+          git add reports/
+          git status
+          git diff-index --quiet HEAD || git commit -m "chore(telemetry): update daily analytics report [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
