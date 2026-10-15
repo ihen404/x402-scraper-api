@@ -4,7 +4,7 @@ import crypto from 'crypto';
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
 
 console.log('🚀 Initializing x402-scraper-api on port:', PORT);
@@ -44,7 +44,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(parseInt(PORT, 10), '0.0.0.0', () => {
   console.log('✅ x402 Scraper API successfully listening on 0.0.0.0:' + PORT);
 });
 
