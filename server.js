@@ -4,10 +4,10 @@ import crypto from 'crypto';
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
 
-app.post('/', (req, res) => {
+function handleProof(req, res) {
   const { method, params, id } = req.body || {};
   if (method === 'tools/call' && params && params.name === 'scrape_proof') {
     const args = params.arguments || {};
@@ -33,7 +33,10 @@ app.post('/', (req, res) => {
     },
     id: id || 1
   });
-});
+}
+
+app.post('/', handleProof);
+app.post('/mcp', handleProof);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
