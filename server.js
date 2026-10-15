@@ -8,7 +8,7 @@ const app = express();
 app.use(express.json());
 app.use((req, res, next) => { console.log(`📥 Incoming request: ${req.method} ${req.url}`); next(); });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
 
 console.log('🚀 Initializing'); process.stdout.write(''); // Force flush
