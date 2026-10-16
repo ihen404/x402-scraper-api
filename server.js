@@ -5,6 +5,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 1. Request Logging Middleware
+app.use((req, res, next) => {
+  console.log(`[Incoming] ${req.method} ${req.url}`);
+  console.log(`[Headers] `, JSON.stringify(req.headers));
+  console.log(`[Body] `, JSON.stringify(req.body));
+  next();
+});
+
 const telemetry = {
   service: "x402 Scraper API",
   version: "3.5.0",
@@ -18,24 +26,29 @@ const telemetry = {
 const TIER_PRICES = { scrape_basic: 0.01, scrape_dynamic: 0.05, scrape_structured: 0.15 };
 
 app.post("/mcp", (req, res) => {
-  const hasPayment = req.headers["payment-signature"] || req.headers["x-payment-proof"];
-  const toolName = req.body?.params?.name || "scrape_basic";
-  const price = TIER_PRICES[toolName] || 0.01;
-  const key = toolName.replace("scrape_", "");
+  try {
+    const hasPayment = req.headers["payment-signature"] || req.headers["x-payment-proof"];
+    const toolName = req.body?.params?.name || "scrape_basic";
+    const price = TIER_PRICES[toolName] || 0.01;
+    const key = toolName.replace("scrape_", "");
 
-  if (hasPayment) {
-    telemetry.live_onchain.totalRequests++;
-    telemetry.live_onchain.successfulScrapes++;
-    telemetry.live_onchain.usdcRevenue += price;
-    if (telemetry.live_onchain.tiers[key] !== undefined) telemetry.live_onchain.tiers[key]++;
-  } else {
-    telemetry.test_simulation.totalRequests++;
-    telemetry.test_simulation.successfulScrapes++;
-    telemetry.test_simulation.simulatedRevenue += price;
-    if (telemetry.test_simulation.tiers[key] !== undefined) telemetry.test_simulation.tiers[key]++;
+    if (hasPayment) {
+      telemetry.live_onchain.totalRequests++;
+      telemetry.live_onchain.successfulScrapes++;
+      telemetry.live_onchain.usdcRevenue += price;
+      if (telemetry.live_onchain.tiers[key] !== undefined) telemetry.live_onchain.tiers[key]++;
+    } else {
+      telemetry.test_simulation.totalRequests++;
+      telemetry.test_simulation.successfulScrapes++;
+      telemetry.test_simulation.simulatedRevenue += price;
+      if (telemetry.test_simulation.tiers[key] !== undefined) telemetry.test_simulation.tiers[key]++;
+    }
+
+    return res.json({ jsonrpc: "2.0", result: { status: "success" }, id: req.body?.id || 1 });
+  } catch (err) {
+    console.error("[Error] POST /mcp failed:", err);
+    return res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: err.message }, id: req.body?.id || 1 });
   }
-
-  res.json({ jsonrpc: "2.0", result: { status: "success" }, id: req.body?.id || 1 });
 });
 
 app.get("/telemetry", (req, res) => {
