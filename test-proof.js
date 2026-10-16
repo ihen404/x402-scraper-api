@@ -1,5 +1,5 @@
 async function testCryptographicProof() {
-  const BASE_URL = "https://x402-scraper-api-production-67a4.up.railway.app";
+  const BASE_URL = "https://x402-scraper-api.onrender.com";
   
   console.log("🔒 [Security Test] Requesting Cryptographic Proof-of-Scrape (`scrape_proof`)...");
   
