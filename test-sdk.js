@@ -8,7 +8,7 @@ async function runSDKTest() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      walletAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      walletAddress: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
       txHash: `0xTEST_SDK_${Date.now()}`,
       amountUSDC: 5.00
     })

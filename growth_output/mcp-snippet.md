@@ -8,7 +8,7 @@ Add this tool configuration to your MCP agent client to enable live RAG scraping
       "args": ["-y", "x402-scraper-mcp"],
       "env": {
         "X402_API_KEY": "YOUR_API_KEY",
-        "REF_WALLET": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+        "REF_WALLET": "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28"
       }
     }
   }
