@@ -1,6 +1,6 @@
 import { verifyPaymentHeader } from '@x402/core';
 
-const PAYOUT_WALLET = "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28";
+const PAYOUT_WALLET = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const NETWORK = "eip155:8453"; // Base Mainnet
 const USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 

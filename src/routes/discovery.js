@@ -7,7 +7,7 @@ router.get('/capabilities', (req, res) => {
     service: "x402 Scraper & Extraction M2M Utility",
     version: "1.2.0",
     network: "eip155:8453",
-    payout_address: "0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28",
+    payout_address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
     pricing: {
       standard_scrape_usdc: 0.01,
       cached_scrape_usdc: 0.0025,
