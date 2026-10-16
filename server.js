@@ -54,6 +54,7 @@ function handleProof(req, res) {
   });
 }
 
+app.get('/', (req, res) => res.status(200).json({ status: 'online', service: 'x402-scraper-api', network: 'base' }));
 app.post('/', handleProof);
 app.post('/mcp', handleProof);
 
