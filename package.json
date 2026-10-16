@@ -8,6 +8,13 @@
     "test": "node test.js",
     "start": "node server.js"
   },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.11.3",
+    "puppeteer": "^22.6.0",
+    "resend": "^3.2.0",
+    "dotenv": "^16.4.5"
+  },
   "keywords": [
     "x402",
     "mcp",
