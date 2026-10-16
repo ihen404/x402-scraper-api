@@ -5,17 +5,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. Request Logging Middleware
+// Global request logger
 app.use((req, res, next) => {
-  console.log(`[Incoming] ${req.method} ${req.url}`);
-  console.log(`[Headers] `, JSON.stringify(req.headers));
-  console.log(`[Body] `, JSON.stringify(req.body));
+  console.log(`[HTTP] ${req.method} ${req.url}`);
   next();
 });
 
 const telemetry = {
   service: "x402 Scraper API",
-  version: "3.5.0",
+  version: "3.5.1",
   network: "Base Mainnet (8453)",
   wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
   startedAt: new Date().toISOString(),
@@ -24,6 +22,14 @@ const telemetry = {
 };
 
 const TIER_PRICES = { scrape_basic: 0.01, scrape_dynamic: 0.05, scrape_structured: 0.15 };
+
+app.get("/", (req, res) => {
+  res.send("x402 Scraper API is running");
+});
+
+app.get("/telemetry", (req, res) => {
+  res.json({ ...telemetry, timestamp: new Date().toISOString() });
+});
 
 app.post("/mcp", (req, res) => {
   try {
@@ -46,16 +52,12 @@ app.post("/mcp", (req, res) => {
 
     return res.json({ jsonrpc: "2.0", result: { status: "success" }, id: req.body?.id || 1 });
   } catch (err) {
-    console.error("[Error] POST /mcp failed:", err);
-    return res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: err.message }, id: req.body?.id || 1 });
+    console.error("[Error in /mcp]:", err);
+    return res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: err.message } });
   }
-});
-
-app.get("/telemetry", (req, res) => {
-  res.json({ ...telemetry, timestamp: new Date().toISOString() });
 });
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[x402 Scraper API] Running on port ${PORT}`);
+  console.log(`[x402 Scraper API] Listening on 0.0.0.0:${PORT}`);
 });
