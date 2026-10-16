@@ -1,15 +1,3 @@
-console.log('[BOOT] Starting server.js process...');
-console.log('[BOOT] Starting server.js process...');
-
-  process.on("uncaughtException", (err) => {
-    console.error("UNCAUGHT EXCEPTION:", err);
-  });
-  process.on("unhandledRejection", (reason, promise) => {
-    console.error("UNHANDLED REJECTION:", reason);
-  });
-  process.on("uncaughtException", (err) => { console.error("💥 Uncaught Exception:", err); process.exit(1); });
-process.on("unhandledRejection", (reason, promise) => { console.error("💥 Unhandled Rejection at:", promise, "reason:", reason); process.exit(1); });
-
 import express from 'express';
 import crypto from 'crypto';
 
@@ -19,11 +7,26 @@ app.use((req, res, next) => { console.log(`📥 Incoming request: ${req.method} 
 
 const PORT = process.env.PORT || 8080;
 const SECRET = process.env.X402_PROOF_SECRET || 'x402_secure_master_signing_key_2026';
+const RECIPIENT_WALLET = '0x391e20e3f938d9aa3b39c7f4aa1cb6cbd6a9df28';
+const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
-console.log('🚀 Initializing'); process.stdout.write(''); // Force flush
 console.log('🚀 Initializing x402-scraper-api on port:', PORT);
 
 function handleProof(req, res) {
+  const paymentProof = req.headers['x-payment-proof'];
+
+  if (!paymentProof) {
+    return res.status(402).json({
+      error: 'Payment Required',
+      accepts: {
+        asset: USDC_CONTRACT,
+        payTo: RECIPIENT_WALLET,
+        network: 'base',
+        amount: '100000'
+      }
+    });
+  }
+
   const { method, params, id } = req.body || {};
   if (method === 'tools/call' && params && params.name === 'scrape_proof') {
     const args = params.arguments || {};
@@ -47,7 +50,7 @@ function handleProof(req, res) {
     result: {
       content: [{ type: 'text', text: 'Execution completed successfully.' }]
     },
-    id: id || 1
+    id: id || 777
   });
 }
 

@@ -1,5 +1,5 @@
 async function testScraper() {
-  const endpoint = 'https://x402-scraper-api-production-67a4.up.railway.app/api/scrape';
+  const endpoint = 'http://127.0.0.1:8080/';
   
   console.log('Sending request to x402 scraper...');
   try {
