@@ -1,5 +1,5 @@
 async function executeSwarmSuite() {
-  const BASE_URL = "https://x402-scraper-api-production-67a4.up.railway.app/mcp";
+  const BASE_URL = "https://x402-scraper-api.onrender.com/mcp";
   
   console.log("==================================================================");
   console.log("🐝 [Active Swarm Client] Initiating Multi-Rail & Token Minification Seeding");
