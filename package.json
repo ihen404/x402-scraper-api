@@ -2,7 +2,7 @@
   "name": "@ihentrel/x402-scraper-client",
   "version": "1.0.0",
   "description": "High-efficiency, token-minified x402 scraper client for AI agents and autonomous swarms supporting Base, Arbitrum, and Solana.",
-  "main": "index.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
     "test": "node test.js",
