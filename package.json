@@ -9,7 +9,11 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "node-cron": "^4.6.0",
     "pg": "^8.23.1",
     "resend": "^6.34.1"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11"
   }
 }
