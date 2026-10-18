@@ -1,5 +1,5 @@
 async function testPaidScraper() {
-  const endpoint = 'http://127.0.0.1:8080/';
+  const endpoint = 'https://x402-scraper-api-production-67a4.up.railway.app/mcp';
   
   console.log('Sending paid request with x-payment-proof...');
   try {
