@@ -1,5 +1,5 @@
 {
-  "name": "x402-scraper-api",
+  "name": "x402-scraper-mcp-client",
   "version": "3.5.1",
   "type": "module",
   "main": "index.js",

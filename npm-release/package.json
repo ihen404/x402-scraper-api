@@ -1,7 +1,7 @@
 {
   "name": "x402-scraper-client",
-  "version": "1.0.0",
-  "description": "High-efficiency, token-minified x402 scraper client for AI agents and autonomous swarms supporting Base, Arbitrum, and Solana.",
+  "version": "1.1.0",
+  "description": "Autonomous multi-chain x402 HTTP micropayment web scraping API client for Solana and Base EVM",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -23,5 +23,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ihentrel/x402-scraper-api.git"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./solana": "./solana-tool-wrapper.js",
+    "./base": "./base-tool-wrapper.js",
+    "./elizaos": "./elizaos-x402-plugin.js",
+    "./pulse": "./x402-pulse.js"
   }
 }
