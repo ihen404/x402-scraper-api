@@ -24,9 +24,9 @@ app.get('/.well-known/mcp.json', (req, res) => {
         },
         {
           "chain": "solana-mainnet",
-          "token": "SPL-USDC",
-          "token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-          "recipient_wallet": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+        "token": "SPL-USDC",
+        "token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "recipient_wallet": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
           "price_per_request": "0.01"
         }
       ]
