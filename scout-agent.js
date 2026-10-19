@@ -25,3 +25,6 @@ async function runScoutCycle() {
 }
 
 runScoutCycle();
+
+// Run every 30 minutes continuously
+setInterval(runScoutCycle, 30 * 60 * 1000);
