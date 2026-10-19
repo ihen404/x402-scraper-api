@@ -1,17 +1,23 @@
-// Weekly x402 Protocol & Market Intelligence Script
-async function runIntelligencePulse() {
-  console.log("===============================================================");
-  console.log("📊 WEEKLY x402 PROTOCOL & MARKET INTELLIGENCE REPORT");
-  console.log("===============================================================");
-  console.log("1. NETWORK SPLIT: ~70% Solana (SVM) / ~30% Base (EVM)");
-  console.log("   • Solana: High-frequency agentic micro-payments (400ms finality)");
-  console.log("   • Base: Enterprise agent settlements & CDP wallet ecosystems");
-  console.log("\n2. PROTOCOL SPECIFICATION (x402 V2 STANDARD):");
-  console.log("   • Response Header: PAYMENT-REQUIRED (Base64 JSON envelope)");
-  console.log("   • Request Header:  PAYMENT-SIGNATURE (EIP-3009 / SVM transfer auth)");
-  console.log("   • Settlement Header: PAYMENT-RESPONSE");
-  console.log("\n3. HIGH-VOLUME TARGET AGENT FRAMEWORKS:");
-  console.log("   • Solana Agent Kit | Eliza OS Swarms | LangChain Paid Tools | Smithery API");
-  console.log("===============================================================");
+// x402 Pulse - Automated Telemetry & Protocol Intelligence
+class X402Pulse {
+  constructor(config = {}) {
+    this.endpoint = config.endpoint || "https://x402-scraper-api-production-67a4.up.railway.app/";
+  }
+
+  async checkHealth() {
+    try {
+      const start = Date.now();
+      const res = await fetch(this.endpoint);
+      const data = await res.json();
+      const latency = Date.now() - start;
+      
+      console.log(`[x402-pulse] Status: ${data.status} | Latency: ${latency}ms | Service: ${data.service}`);
+      return { online: true, latency, data };
+    } catch (err) {
+      console.error("[x402-pulse] Health check failed:", err.message);
+      return { online: false, error: err.message };
+    }
+  }
 }
-runIntelligencePulse();
+
+export default X402Pulse;
