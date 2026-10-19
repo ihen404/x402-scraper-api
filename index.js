@@ -83,50 +83,67 @@ app.get("/telemetry", (req, res) => {
 
 app.post("/mcp", (req, res) => {
 
-// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery (Schema Compliant)
+
+// Allow all MCP protocol handshakes, discovery, and list methods unauthenticated
 const reqMethod = req.body && req.body.method;
-if (reqMethod === "initialize" || reqMethod === "ping" || reqMethod === "tools/list") {
+
 if (reqMethod === "initialize") {
-  return res.status(200).json({
-    jsonrpc: "2.0",
-    result: {
-      protocolVersion: "2024-11-05",
-      capabilities: { tools: {} },
-      serverInfo: {
-        name: "x402-scraper-api",
-        version: "1.1.0"
-      }
-    },
-    id: req.body ? req.body.id : 1
-  });
+return res.status(200).json({
+  jsonrpc: "2.0",
+  result: {
+    protocolVersion: "2024-11-05",
+    capabilities: { tools: {} },
+    serverInfo: { name: "x402-scraper-api", version: "1.1.0" }
+  },
+  id: req.body ? req.body.id : 1
+});
 }
+
 if (reqMethod === "tools/list") {
-  return res.status(200).json({
-    jsonrpc: "2.0",
-    result: {
-      tools: [
-        {
-          name: "scrape_basic",
-          description: "Scrapes structured web page content ($0.01 USDC micro-transaction).",
-          inputSchema: {
-            type: "object",
-            properties: { url: { type: "string" } },
-            required: ["url"]
-          }
+return res.status(200).json({
+  jsonrpc: "2.0",
+  result: {
+    tools: [
+      {
+        name: "scrape_basic",
+        description: "Scrapes structured web page content ($0.01 USDC micro-transaction).",
+        inputSchema: {
+          type: "object",
+          properties: { url: { type: "string" } },
+          required: ["url"]
         }
-      ]
-    },
-    id: req.body ? req.body.id : 1
-  });
+      }
+    ]
+  },
+  id: req.body ? req.body.id : 1
+});
 }
-if (reqMethod === "ping") {
-  return res.status(200).json({
-    jsonrpc: "2.0",
-    result: {},
-    id: req.body ? req.body.id : 1
-  });
+
+if (reqMethod === "ping" || reqMethod !== "tools/call") {
+return res.status(200).json({
+  jsonrpc: "2.0",
+  result: {},
+  id: req.body ? req.body.id : 1
+});
 }
+
+// ENFORCE $0.01 USDC PAYMENT ONLY WHEN EXECUTING tools/call
+const paymentSignature = req.headers["payment-signature"] || req.headers["x-payment-signature"];
+if (!paymentSignature) {
+return res.status(402).json({
+  jsonrpc: "2.0",
+  error: {
+    code: 402,
+    message: "Payment Required. Attach a valid x402 payment signature (PAYMENT-SIGNATURE header) in USDC on Base or Solana.",
+    payment_requirements: {
+      base: { recipient: "0xD4fd01ce7B0131eD77342d0375507110742EB925", token: "USDC", chainId: 8453, amount: "0.01" },
+      solana: { recipient: "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz", token: "SPL-USDC", amount: "0.01" }
+    }
+  },
+  id: req.body ? req.body.id : 1
+});
 }
+
 
 
 // Allow unauthenticated Glama/MCP protocol handshakes & tool discovery
