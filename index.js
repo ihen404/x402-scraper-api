@@ -2,6 +2,13 @@ import express from "express";
 import cors from "cors";
 
 const app = express();
+
+// Explicit Auto-Discovery Endpoint
+app.get('/.well-known/mcp.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(process.cwd(), 'public/.well-known/mcp.json'));
+});
+
 app.use(cors());
 app.use(express.json());
 
