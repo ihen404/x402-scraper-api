@@ -5,6 +5,44 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+// Dynamic Anti-Abuse Rate Limiter
+const requestTracker = new Map();
+
+function dynamicRateLimiter(req, res, next) {
+// Fast-path bypass for paying agents
+const hasPaymentSig = req.headers["payment-signature"] || req.headers["x-payment-signature"];
+if (hasPaymentSig) return next();
+
+const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+const now = Date.now();
+const windowMs = 60 * 1000; // 1 minute
+const maxRequests = 30;
+
+if (!requestTracker.has(ip)) {
+requestTracker.set(ip, { count: 1, startTime: now });
+return next();
+}
+
+const tracker = requestTracker.get(ip);
+if (now - tracker.startTime > windowMs) {
+requestTracker.set(ip, { count: 1, startTime: now });
+return next();
+}
+
+if (tracker.count >= maxRequests) {
+return res.status(429).json({
+  jsonrpc: "2.0",
+  error: { code: 429, message: "Too Many Requests. Unauthenticated rate limit exceeded (30 req/min). Attach a payment signature to bypass." },
+  id: req.body ? req.body.id : 1
+});
+}
+
+tracker.count++;
+next();
+}
+
+app.use(dynamicRateLimiter);
+
 app.get("/health", (req, res) => {
 res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -12,7 +50,6 @@ res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 app.post("/mcp", async (req, res) => {
 const reqMethod = req.body && req.body.method;
 
-// Unauthenticated MCP protocol handshakes & discovery
 if (reqMethod === "initialize") {
 return res.status(200).json({
   jsonrpc: "2.0",
@@ -62,7 +99,6 @@ return res.status(200).json({
 });
 }
 
-// ENFORCE $0.01 / $0.03 USDC PAYMENT ON tools/call
 const paymentSignature = req.headers["payment-signature"] || req.headers["x-payment-signature"];
 const toolParams = req.body && req.body.params;
 const toolName = toolParams && toolParams.name;
@@ -73,7 +109,7 @@ return res.status(402).json({
   jsonrpc: "2.0",
   error: {
     code: 402,
-    message: `Payment Required. Attach a valid x402 payment signature (PAYMENT-SIGNATURE header) in USDC on Base or Solana.`,
+    message: "Payment Required. Attach a valid x402 payment signature (PAYMENT-SIGNATURE header) in USDC on Base or Solana.",
     payment_requirements: {
       base: { recipient: "0xD4fd01ce7B0131eD77342d0375507110742EB925", token: "USDC", chainId: 8453, amount: price },
       solana: { recipient: "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz", token: "SPL-USDC", amount: price }
@@ -83,7 +119,6 @@ return res.status(402).json({
 });
 }
 
-// Execution placeholder for verified tool execution
 return res.status(200).json({
 jsonrpc: "2.0",
 result: {
