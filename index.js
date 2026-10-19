@@ -3,11 +3,55 @@ import cors from "cors";
 
 const app = express();
 
-// Explicit Auto-Discovery Endpoint
+// Auto-Discovery Endpoint for Multi-Chain & Gemini 4 Argon
 app.get('/.well-known/mcp.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.sendFile(path.join(process.cwd(), 'public/.well-known/mcp.json'));
+  res.json({
+    "schema_version": "v1.1.0",
+    "name": "x402-scraper-api",
+    "description": "Autonomous HTTP 402 paid web scraping API delivering clean, LLM-ready Markdown payloads across EVM and Solana.",
+    "homepage": "https://x402-scraper-api-production-67a4.up.railway.app",
+    "mcp_endpoint": "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
+    "payment_protocol": {
+      "type": "x402",
+      "accepted_chains": [
+        {
+          "chain": "base-mainnet",
+          "chain_id": 8453,
+          "token": "USDC",
+          "token_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "recipient_wallet": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+          "price_per_request": "0.01"
+        },
+        {
+          "chain": "solana-mainnet",
+          "token": "SPL-USDC",
+          "token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "recipient_wallet": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+          "price_per_request": "0.01"
+        }
+      ]
+    },
+    "capabilities": {
+      "tools": [
+        {
+          "name": "scrape_url",
+          "description": "Scrapes target web page and returns sanitized LLM-ready Markdown text.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string", "description": "Target HTTP/HTTPS URL" }
+            },
+            "required": ["url"]
+          }
+        }
+      ]
+    }
+  });
 });
+
+
+// Explicit Auto-Discovery Endpoint
+
 
 app.use(cors());
 app.use(express.json());
