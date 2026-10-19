@@ -111,9 +111,15 @@ app.post("/mcp", (req, res) => {
     telemetry.live_onchain.totalRequests++;
     telemetry.live_onchain.failureCount++;
     
-    const headerPayload = Buffer.from(JSON.stringify(paymentRequirements)).toString("base64");
-    res.setHeader("PAYMENT-REQUIRED", headerPayload);
-    return res.status(402).json({
+    
+    
+    const paymentRequirements = {
+  base: { recipient: "0xD4fd01ce7B0131eD77342d0375507110742EB925", token: "USDC", chainId: 8453, amount: price.toString() },
+  solana: { recipient: "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz", token: "SPL-USDC", amount: price.toString() }
+};
+const headerPayload = Buffer.from(JSON.stringify(paymentRequirements)).toString("base64");
+res.setHeader("PAYMENT-REQUIRED", headerPayload);
+return res.status(402).json({
       jsonrpc: "2.0",
       error: {
         code: 402,
