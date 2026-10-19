@@ -111,6 +111,8 @@ app.post("/mcp", (req, res) => {
     telemetry.live_onchain.totalRequests++;
     telemetry.live_onchain.failureCount++;
     
+    const headerPayload = Buffer.from(JSON.stringify(paymentRequirements)).toString("base64");
+    res.setHeader("PAYMENT-REQUIRED", headerPayload);
     return res.status(402).json({
       jsonrpc: "2.0",
       error: {
