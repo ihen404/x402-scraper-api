@@ -4,7 +4,7 @@ import cors from "cors";
 const app = express();
 
 // Auto-Discovery Endpoint for Multi-Chain & Gemini 4 Argon
-app.get('/.well-known/mcp.json', (req, res) => {
+app.get("/.well-known/mcp.json", (req, res) => {
   res.json({
     "schema_version": "v1.1.0",
     "name": "x402-scraper-api",
@@ -24,9 +24,9 @@ app.get('/.well-known/mcp.json', (req, res) => {
         },
         {
           "chain": "solana-mainnet",
-        "token": "SPL-USDC",
-        "token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        "recipient_wallet": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
+          "token": "SPL-USDC",
+          "token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "recipient_wallet": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
           "price_per_request": "0.01"
         }
       ]
@@ -49,10 +49,6 @@ app.get('/.well-known/mcp.json', (req, res) => {
   });
 });
 
-
-// Explicit Auto-Discovery Endpoint
-
-
 app.use(cors());
 app.use(express.json());
 
@@ -65,8 +61,11 @@ app.use((req, res, next) => {
 const telemetry = {
   service: "x402 Scraper API",
   version: "3.5.1",
-  network: "Base Mainnet (8453)",
-  wallet: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+  network: "Base Mainnet (8453) + Solana",
+  wallets: {
+    base: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+    solana: "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz"
+  },
   startedAt: new Date().toISOString(),
   live_onchain: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, usdcRevenue: 0.00, tiers: { basic: 0, dynamic: 0, structured: 0 } },
   test_simulation: { totalRequests: 0, successfulScrapes: 0, failureCount: 0, simulatedRevenue: 0.00, tiers: { basic: 0, dynamic: 0, structured: 0 } }
@@ -75,7 +74,7 @@ const telemetry = {
 const TIER_PRICES = { scrape_basic: 0.01, scrape_dynamic: 0.05, scrape_structured: 0.15 };
 
 app.get("/", (req, res) => {
-  res.send("x402 Scraper API is running");
+  res.json({ status: "online", service: "x402-scraper-api" });
 });
 
 app.get("/telemetry", (req, res) => {
@@ -84,7 +83,8 @@ app.get("/telemetry", (req, res) => {
 
 app.post("/mcp", (req, res) => {
   try {
-    const hasPayment = req.headers["payment-signature"] || req.headers["x-payment-proof"];
+    const hasPayment = req.headers["payment-signature"] || req.headers["x-payment-proof"] || req.headers["authorization"];
+    const isTestMode = req.headers["x-test-mode"] === "true";
     const toolName = req.body?.params?.name || "scrape_basic";
     const price = TIER_PRICES[toolName] || 0.01;
     const key = toolName.replace("scrape_", "");
@@ -94,21 +94,49 @@ app.post("/mcp", (req, res) => {
       telemetry.live_onchain.successfulScrapes++;
       telemetry.live_onchain.usdcRevenue += price;
       if (telemetry.live_onchain.tiers[key] !== undefined) telemetry.live_onchain.tiers[key]++;
-    } else {
+      
+      return res.json({ jsonrpc: "2.0", result: { status: "success", data: "Paid content delivered." }, id: req.body?.id || 1 });
+    }
+
+    if (isTestMode) {
       telemetry.test_simulation.totalRequests++;
       telemetry.test_simulation.successfulScrapes++;
       telemetry.test_simulation.simulatedRevenue += price;
       if (telemetry.test_simulation.tiers[key] !== undefined) telemetry.test_simulation.tiers[key]++;
+      
+      return res.json({ jsonrpc: "2.0", result: { status: "success", mode: "test_simulation" }, id: req.body?.id || 1 });
     }
 
-    return res.json({ jsonrpc: "2.0", result: { status: "success" }, id: req.body?.id || 1 });
+    // Enforce HTTP 402 Payment Required for all unpaid production requests
+    telemetry.live_onchain.totalRequests++;
+    telemetry.live_onchain.failureCount++;
+    
+    return res.status(402).json({
+      jsonrpc: "2.0",
+      error: {
+        code: 402,
+        message: "Payment Required. Attach a valid x402 payment signature (PAYMENT-SIGNATURE header) in USDC on Base or Solana.",
+        payment_requirements: {
+          base: {
+            recipient: "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+            token: "USDC",
+            chainId: 8453,
+            amount: price.toString()
+          },
+          solana: {
+            recipient: "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
+            token: "SPL-USDC",
+            amount: price.toString()
+          }
+        }
+      },
+      id: req.body?.id || 1
+    });
   } catch (err) {
     console.error("[Error in /mcp]:", err);
     return res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: err.message } });
   }
 });
-
-app.get("/", (req, res) => res.json({ status: "online", service: "x402-scraper-api" }));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
