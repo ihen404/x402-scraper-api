@@ -83,8 +83,7 @@ app.get("/telemetry", (req, res) => {
 
 app.post("/mcp", (req, res) => {
 
-
-// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery (MCP Schema Compliant)
+// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery (Schema Compliant)
 const method = req.body && req.body.method;
 if (method === "initialize" || method === "ping" || method === "tools/list") {
 if (method === "initialize") {
@@ -101,7 +100,6 @@ if (method === "initialize") {
     id: req.body ? req.body.id : 1
   });
 }
-
 if (method === "tools/list") {
   return res.status(200).json({
     jsonrpc: "2.0",
@@ -121,7 +119,6 @@ if (method === "tools/list") {
     id: req.body ? req.body.id : 1
   });
 }
-
 if (method === "ping") {
   return res.status(200).json({
     jsonrpc: "2.0",
@@ -130,7 +127,17 @@ if (method === "ping") {
   });
 }
 }
-,
+
+
+// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery
+const method = req.body && req.body.method;
+if (method === "initialize" || method === "ping" || method === "tools/list") {
+return res.status(200).json({
+  jsonrpc: "2.0",
+  result: {
+    name: "x402-scraper-api",
+    version: "1.1.0",
+    capabilities: { tools: {} },
     tools: [
       {
         name: "scrape_basic",
