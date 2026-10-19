@@ -30,5 +30,9 @@
     "./base": "./base-tool-wrapper.js",
     "./elizaos": "./elizaos-x402-plugin.js",
     "./pulse": "./x402-pulse.js"
+  },
+  "dependencies": {
+    "x402-scraper-client": "file:x402-scraper-client-1.1.0.tgz",
+    "x402-scraper-mcp-client": "github:ihen404/x402-scraper-api"
   }
 }
