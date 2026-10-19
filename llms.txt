@@ -1,0 +1,26 @@
+# x402 Scraper API
+
+> Autonomous, framework-agnostic web scraper powered by x402 HTTP micropayments across Solana and Base EVM.
+
+## Overview
+- **Base URL:** https://x402-scraper-api-production-67a4.up.railway.app
+- **Protocol:** x402 V2 (HTTP 402 Payment Required + Base64 PAYMENT-REQUIRED header)
+- **Supported Chains:** Solana (SPL-USDC) & Base (EVM USDC)
+- **Pricing:** $0.01 USDC per request
+
+## Endpoints
+- **POST /mcp** - JSON-RPC 2.0 endpoint for scraping tools (e.g., `scrape_basic`).
+
+## Quick Integration (Solana)
+```javascript
+import X402ScraperSolanaTool from "./solana-tool-wrapper.js";
+const tool = new X402ScraperSolanaTool();
+const result = await tool.invoke("https://example.com");
+```
+
+## Quick Integration (Base)
+```javascript
+import X402ScraperBaseTool from "./base-tool-wrapper.js";
+const tool = new X402ScraperBaseTool();
+const result = await tool.invoke("https://example.com");
+```

@@ -2,11 +2,12 @@
   "name": "x402-scraper-api",
   "version": "3.5.1",
   "type": "module",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "@google/genai": "^2.30.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "node-cron": "^4.6.0",
@@ -15,5 +16,13 @@
   },
   "devDependencies": {
     "@types/node-cron": "^3.0.11"
+  },
+  "description": "Autonomous multi-chain x402 HTTP micropayment web scraping API wrappers for Solana and Base",
+  "exports": {
+    ".": "./index.js",
+    "./solana": "./solana-tool-wrapper.js",
+    "./base": "./base-tool-wrapper.js",
+    "./elizaos": "./elizaos-x402-plugin.js",
+    "./pulse": "./x402-pulse.js"
   }
 }
