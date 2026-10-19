@@ -84,9 +84,9 @@ app.get("/telemetry", (req, res) => {
 app.post("/mcp", (req, res) => {
 
 // Allow unauthenticated Glama/MCP protocol handshakes & tool discovery (Schema Compliant)
-const method = req.body && req.body.method;
-if (method === "initialize" || method === "ping" || method === "tools/list") {
-if (method === "initialize") {
+const reqMethod = req.body && req.body.method;
+if (reqMethod === "initialize" || reqMethod === "ping" || reqMethod === "tools/list") {
+if (reqMethod === "initialize") {
   return res.status(200).json({
     jsonrpc: "2.0",
     result: {
@@ -100,7 +100,7 @@ if (method === "initialize") {
     id: req.body ? req.body.id : 1
   });
 }
-if (method === "tools/list") {
+if (reqMethod === "tools/list") {
   return res.status(200).json({
     jsonrpc: "2.0",
     result: {
@@ -119,7 +119,7 @@ if (method === "tools/list") {
     id: req.body ? req.body.id : 1
   });
 }
-if (method === "ping") {
+if (reqMethod === "ping") {
   return res.status(200).json({
     jsonrpc: "2.0",
     result: {},
