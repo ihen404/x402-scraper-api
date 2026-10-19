@@ -1,16 +1,14 @@
-startCommand:
-  type: http
-  url: "https://x402-scraper-api-production-67a4.up.railway.app/mcp"
-configSchema:
-  type: object
-  properties:
-    paymentSignature:
-      type: string
-      description: "x402 Payment-Signature or 24-hour subscription pass token"
-      x-from:
-        header: "Payment-Signature"
-    preferredChain:
-      type: string
-      default: "eip155:8453"
-      enum: ["eip155:8453", "eip155:42161", "solana:mainnet"]
-      description: "Settlement network for x402 micro-settlements (Base, Arbitrum, Solana)"
+version: '1.1.0'
+name: '@ihentrel/x402-scraper-api'
+description: 'Autonomous HTTP 402 paid web scraping API delivering clean, LLM-ready Markdown payloads across Base and Solana.'
+homepage: 'https://x402-scraper-api-production-67a4.up.railway.app'
+mcp_endpoint: 'https://x402-scraper-api-production-67a4.up.railway.app/mcp'
+auto_discovery: 'https://x402-scraper-api-production-67a4.up.railway.app/.well-known/mcp.json'
+payment:
+  protocol: 'x402'
+  chains:
+    - name: 'base-mainnet'
+      chainId: 8453
+      recipient: '0xD4fd01ce7B0131eD77342d0375507110742EB925'
+    - name: 'solana-mainnet'
+      recipient: 'CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz'
