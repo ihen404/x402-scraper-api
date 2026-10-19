@@ -1,7 +1,5 @@
-// Solana Agent Kit Wrapper for x402 Scraper API
-// Purpose: Expose scrape capabilities directly to Solana Agent Kit & Eliza framework runners
-
-class X402ScraperSolanaTool {
+// Solana Agent Kit Wrapper for x402 Scraper API (ES Module)
+export default class X402ScraperSolanaTool {
   constructor(config = {}) {
     this.endpoint = config.endpoint || "https://x402-scraper-api-production-67a4.up.railway.app/mcp";
     this.solanaRecipient = "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz";
@@ -34,5 +32,3 @@ class X402ScraperSolanaTool {
     return await res.json();
   }
 }
-
-module.exports = X402ScraperSolanaTool;
