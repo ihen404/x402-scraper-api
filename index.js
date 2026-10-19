@@ -83,15 +83,54 @@ app.get("/telemetry", (req, res) => {
 
 app.post("/mcp", (req, res) => {
 
-// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery
+
+// Allow unauthenticated Glama/MCP protocol handshakes & tool discovery (MCP Schema Compliant)
 const method = req.body && req.body.method;
 if (method === "initialize" || method === "ping" || method === "tools/list") {
-return res.status(200).json({
-  jsonrpc: "2.0",
-  result: {
-    name: "x402-scraper-api",
-    version: "1.1.0",
-    capabilities: { tools: {} },
+if (method === "initialize") {
+  return res.status(200).json({
+    jsonrpc: "2.0",
+    result: {
+      protocolVersion: "2024-11-05",
+      capabilities: { tools: {} },
+      serverInfo: {
+        name: "x402-scraper-api",
+        version: "1.1.0"
+      }
+    },
+    id: req.body ? req.body.id : 1
+  });
+}
+
+if (method === "tools/list") {
+  return res.status(200).json({
+    jsonrpc: "2.0",
+    result: {
+      tools: [
+        {
+          name: "scrape_basic",
+          description: "Scrapes structured web page content ($0.01 USDC micro-transaction).",
+          inputSchema: {
+            type: "object",
+            properties: { url: { type: "string" } },
+            required: ["url"]
+          }
+        }
+      ]
+    },
+    id: req.body ? req.body.id : 1
+  });
+}
+
+if (method === "ping") {
+  return res.status(200).json({
+    jsonrpc: "2.0",
+    result: {},
+    id: req.body ? req.body.id : 1
+  });
+}
+}
+,
     tools: [
       {
         name: "scrape_basic",
