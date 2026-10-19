@@ -99,6 +99,7 @@ return res.status(200).json({
 });
 }
 
+
 if (reqMethod === "tools/list") {
 return res.status(200).json({
   jsonrpc: "2.0",
@@ -106,13 +107,28 @@ return res.status(200).json({
     tools: [
       {
         name: "scrape_basic",
-        description: "Scrapes structured web page content ($0.01 USDC micro-transaction).",
+        description: "Scrapes static web page content ($0.01 USDC micro-transaction).",
+        inputSchema: {
+          type: "object",
+          properties: { url: { type: "string" } },
+          required: ["url"]
+        }
+      },
+      {
+        name: "scrape_advanced",
+        description: "Scrapes JavaScript-rendered SPAs, React apps, and dynamic sites with headless rendering ($0.03 USDC micro-transaction).",
         inputSchema: {
           type: "object",
           properties: { url: { type: "string" } },
           required: ["url"]
         }
       }
+    ]
+  },
+  id: req.body ? req.body.id : 1
+});
+}
+
     ]
   },
   id: req.body ? req.body.id : 1
