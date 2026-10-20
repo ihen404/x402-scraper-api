@@ -83,3 +83,12 @@ curl -s https://x402-scraper-api-production-67a4.up.railway.app/telemetry
 
 ## 🚀 License
 MIT © 2026 x402 Scraper API
+## 🤖 Claude Code & AI Agent Quickstart
+
+Give your autonomous agents (Claude Code, ElizaOS, Cursor) native paywall-scraping capabilities using x402 micro-payments on Base or Solana. No API key subscriptions required.
+
+### Install via Claude Code
+Clone the repository into your local workspace or agent environment:
+
+```bash
+git clone [https://github.com/your-username/x402-scraper-api.git](https://github.com/your-username/x402-scraper-api.git)
