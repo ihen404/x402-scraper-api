@@ -1,5 +1,8 @@
 name: Autonomous Seeder Backup Trigger
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # Runs every 6 hours as a backup traffic seeder

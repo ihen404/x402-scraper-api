@@ -1,5 +1,8 @@
 name: Daily Telemetry Report
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '0 8 * * *' # Runs daily at 8:00 AM UTC
