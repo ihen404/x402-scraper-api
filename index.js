@@ -122,7 +122,18 @@ return res.status(402).json({
 return res.status(200).json({
 jsonrpc: "2.0",
 result: {
-  content: [{ type: "text", text: `[x402 Scraper] Successfully executed ${toolName || "scrape_basic"}.` }]
+  content: [{ type: "text", text: await (async () => {
+  try {
+    const targetUrl = req.body?.params?.arguments?.url || req.body?.params?.url || req.body?.url || "https://example.com";
+    const res = await fetch(targetUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+    });
+    const text = await res.text();
+    return text.slice(0, 15000);
+  } catch (err) {
+    return "Fetch Error: " + err.message;
+  }
+})() }]
 },
 id: req.body ? req.body.id : 1
 });
