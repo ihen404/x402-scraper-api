@@ -1,67 +1,48 @@
-// x402 Scraper API - Autonomous Swarm Client Simulator
-// Simulates an agent swarm executing multiple scraping tasks with USDC micro-payments.
+import fetch from 'node-fetch';
 
-const ENDPOINT = "https://x402-scraper-api-production-67a4.up.railway.app/mcp";
-
-const targets = [
-  { tool: "scrape_basic", url: "https://example.com" },
-  { tool: "scrape_advanced", url: "https://news.ycombinator.com" },
-  { tool: "scrape_basic", url: "https://httpbin.org/json" },
-  { tool: "scrape_advanced", url: "https://github.com/trending" }
-];
+const GATEWAY_URL = 'https://x402-scraper-api-production-67a4.up.railway.app/mcp';
+const TARGET_URL = 'https://news.ycombinator.com';
 
 async function runSwarmCycle() {
-  console.log("🐝 [Swarm Client] Initiating automated scraping cycle across agent swarm...");
+  console.log(`🤖 [Swarm Agent] Initiating request to gateway for: ${TARGET_URL}`);
+  
+  // 1. Initial unauthenticated request
+  const initialRes = await fetch(GATEWAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: TARGET_URL })
+  });
 
-  for (let i = 0; i < targets.length; i++) {
-    const target = targets[i];
-    console.log(`\n🤖 Agent [Swarm-#${i+1}] requesting ${target.tool} for ${target.url}...`);
+  if (initialRes.status === 402) {
+    console.log(`⚡ [x402 Protocol] Received HTTP 402 Payment Challenge.`);
+    const data = await initialRes.json();
+    console.log(`📋 Payment Requirements:`, JSON.stringify(data.error.payment_requirements, null, 2));
 
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "tools/call",
-          params: { name: target.tool, arguments: { url: target.url } },
-          id: i + 1
-        })
-      });
+    // Simulate signing an x402 V2 payment payload (Base / USDC)
+    console.log(`✍️ [Swarm Agent] Signing USDC micro-payment on Base chain...`);
+    const mockSignatureHeader = Buffer.from(JSON.stringify({
+      scheme: "exact",
+      network: "base",
+      txHash: "0x_mock_simulation_tx_hash_for_telemetry_2026"
+    })).toString('base64');
 
-      if (res.status === 402) {
-        const challenge = await res.json();
-        const price = target.tool === "scrape_advanced" ? "0.03" : "0.01";
-        console.log(`💳 Received 402 Payment Challenge. Amount required: $${price} USDC`);
-        console.log(`⚡ Simulating valid on-chain settlement signature on Base/Solana...`);
-        
-        // Re-attempt with simulated payment signature header
-        const paidRes = await fetch(ENDPOINT, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "PAYMENT-SIGNATURE": `mock_usdc_sig_base_solana_${Date.now()}`
-          },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "tools/call",
-            params: { name: target.tool, arguments: { url: target.url } },
-            id: i + 1
-          })
-        });
+    // 2. Retry request with PAYMENT-SIGNATURE header
+    console.log(`🚀 [Swarm Agent] Re-issuing request with PAYMENT-SIGNATURE...`);
+    const paidRes = await fetch(GATEWAY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'PAYMENT-SIGNATURE': mockSignatureHeader
+      },
+      body: JSON.stringify({ url: TARGET_URL })
+    });
 
-        const paidData = await paidRes.json();
-        console.log(`✅ [Swarm-#${i+1}] Scrape successful! Result:`, paidData.result.content[0].text);
-      } else {
-        const data = await res.json();
-        console.log(`✅ [Swarm-#${i+1}] Response:`, data);
-      }
-    } catch (err) {
-      console.error(`❌ [Swarm-#${i+1}] Error during execution:`, err.message);
-    }
+    const result = await paidRes.json();
+    console.log(`✅ [Gateway Response Status]:`, paidRes.status);
+    console.log(`📦 [Extracted Payload Sample]:`, JSON.stringify(result).slice(0, 200) + '...');
+  } else {
+    console.log(`ℹ️ Response received:`, initialRes.status);
   }
-
-  console.log("\n✨ Swarm scraping cycle completed successfully. On-chain telemetry updated.");
 }
 
-runSwarmCycle();
+runSwarmCycle().catch(console.error);
