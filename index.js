@@ -1,3 +1,31 @@
+
+  // --- x402 Bazaar Discovery Metadata ---
+  const bazaarInfo = {
+    discoverable: true,
+    name: "x402 Autonomous News & Intelligence Scraper",
+    description: "Real-time web extraction and AI-ready parsing of Hacker News, TechCrunch, and MarketWatch feeds via USDC micro-payments on Base.",
+    category: "data-services",
+    tags: ["news", "intelligence", "scraping", "mcp", "ai-data"],
+    pricing: {
+      amount: "0.001",
+      asset: "USDC",
+      network: "eip155:8453"
+    },
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target URL to scrape (Hacker News, TechCrunch, MarketWatch)" }
+      },
+      required: ["url"]
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "Extracted raw text or parsed intelligence payload" }
+      }
+    }
+  };
+
 import express from "express";
 
 const app = express();
