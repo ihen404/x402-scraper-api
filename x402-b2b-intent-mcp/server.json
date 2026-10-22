@@ -1,0 +1,11 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schema/server.json",
+  "name": "x402-b2b-intent-mcp",
+  "description": "Extract B2B hiring signals, tech stack, value propositions, and sales hooks from company domains.",
+  "repository": "https://github.com/402-40c2/x402-b2b-intent-mcp",
+  "version": "1.0.0",
+  "transport": {
+    "type": "http",
+    "url": "https://x402-b2b-intent-mcp.vercel.app"
+  }
+}
