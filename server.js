@@ -96,6 +96,9 @@ app.post("/app.post("/mcp", (req, res) => {
 app.get("/", (req, res) => res.json({ status: "online", service: "x402-scraper-api" }));
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 [x402 Gateway] Server running on port ${PORT}`);
+});app.listen(PORT, "0.0.0.0", () => {
   console.log(`[x402 Scraper API] Listening on 0.0.0.0:${PORT}`);
 });
