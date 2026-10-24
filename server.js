@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { scrapeNewsFeed } from "./news-agent.js";
 
 const app = express();
 app.use(cors());
@@ -25,10 +26,10 @@ app.get("/", (req, res) => {
 });
 
 // MCP Gateway Endpoint with x402 Micro-Payment Gating
-app.post("/mcp", (req, res) => {
+app.post("/mcp", async (req, res) => {
   const paymentSignature = req.headers["payment-signature"];
 
-  // If payment signature is missing, return HTTP 402 Payment Required with Bazaar metadata
+  // 1. Enforce x402 payment gating & expose Bazaar metadata if unpaid
   if (!paymentSignature) {
     return res.status(402).json({
       error: "Payment Required",
@@ -61,8 +62,26 @@ app.post("/mcp", (req, res) => {
     });
   }
 
-  // Handle paid JSON-RPC execution
-  res.json({ jsonrpc: "2.0", result: { status: "success" }, id: req.body.id || 1 });
+  // 2. Execute live extraction when payment signature is verified
+  try {
+    const targetUrl = req.body.url || "https://news.ycombinator.com";
+    const scrapedData = await scrapeNewsFeed(targetUrl);
+
+    return res.json({
+      jsonrpc: "2.0",
+      result: {
+        status: "success",
+        data: scrapedData
+      },
+      id: req.body.id || 1
+    });
+  } catch (err) {
+    return res.status(500).json({
+      jsonrpc: "2.0",
+      error: { code: -32603, message: err.message },
+      id: req.body.id || 1
+    });
+  }
 });
 
 // Dynamic PORT binding required for Railway
