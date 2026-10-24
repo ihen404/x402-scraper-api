@@ -1,0 +1,7 @@
+{
+  "total_budget_usdc": 100,
+  "grant_per_dev_usdc": 10,
+  "slots_available": 10,
+  "endpoint": "https://x402-scraper-api-production-67a4.up.railway.app/mcp",
+  "recipients": []
+}

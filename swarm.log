@@ -21,3 +21,62 @@
 ✅ [Swarm-#4] Scrape successful! Result: [x402 Scraper] Successfully executed scrape_advanced.
 
 ✨ Swarm scraping cycle completed successfully. On-chain telemetry updated.
+🤖 [Swarm Agent] Initiating request to gateway for: https://news.ycombinator.com
+⚡ [x402 Protocol] Received HTTP 402 Payment Challenge.
+📋 Payment Requirements: {
+  "base": {
+    "recipient": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+    "token": "USDC",
+    "chainId": 8453,
+    "amount": "0.01"
+  },
+  "solana": {
+    "recipient": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
+    "token": "SPL-USDC",
+    "amount": "0.01"
+  }
+}
+✍️ [Swarm Agent] Signing USDC micro-payment on Base chain...
+🚀 [Swarm Agent] Re-issuing request with PAYMENT-SIGNATURE...
+✅ [Gateway Response Status]: 200
+📦 [Extracted Payload Sample]: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"[x402 Scraper] Successfully executed scrape_basic."}]}}...
+🤖 [Swarm Agent] Initiating request to gateway for: https://news.ycombinator.com
+⚡ [x402 Protocol] Received HTTP 402 Payment Challenge.
+📋 Payment Requirements: {
+  "base": {
+    "recipient": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+    "token": "USDC",
+    "chainId": 8453,
+    "amount": "0.01"
+  },
+  "solana": {
+    "recipient": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
+    "token": "SPL-USDC",
+    "amount": "0.01"
+  }
+}
+✍️ [Swarm Agent] Signing USDC micro-payment on Base chain...
+🚀 [Swarm Agent] Re-issuing request with PAYMENT-SIGNATURE...
+✅ [Gateway Response Status]: 200
+📦 [Extracted Payload Sample]: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"[x402 Scraper] Successfully executed scrape_basic."}]}}...
+🤖 [Swarm Agent] Initiating request to gateway for: https://news.ycombinator.com
+⚡ [x402 Protocol] Received HTTP 402 Payment Challenge.
+📋 Payment Requirements: {
+  "base": {
+    "recipient": "0xD4fd01ce7B0131eD77342d0375507110742EB925",
+    "token": "USDC",
+    "chainId": 8453,
+    "amount": "0.01"
+  },
+  "solana": {
+    "recipient": "CYDk1dEVjpCdD9h6F9x1MeVbr51sHRiPPBgefVdXeTvz",
+    "token": "SPL-USDC",
+    "amount": "0.01"
+  }
+}
+✍️ [Swarm Agent] Signing USDC micro-payment on Base chain...
+🚀 [Swarm Agent] Re-issuing request with PAYMENT-SIGNATURE...
+✅ [Gateway Response Status]: 200
+📦 [Extracted Payload Sample]: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"<html lang=\"en\" op=\"news\"><head><meta name=\"referrer\" content=\"origin\"><meta name=\"viewport\" content=\"width=device-width, initia...
+🤖 [Swarm Agent] Initiating request to gateway for: https://news.ycombinator.com
+ℹ️ Response received: 200
